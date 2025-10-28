@@ -30,7 +30,9 @@ interface AuthContextType {
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  uploadProfileAvatar: (file: File) => Promise<void>;
   updateWorkspace: (updates: Partial<Workspace>) => void;
+  uploadWorkspaceLogo: (file: File) => Promise<void>;
   isAdmin: boolean;
 }
 
@@ -121,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!user) return;
+    if (!user) throw new Error('Not authenticated');
     const { error, data } = await supabase
       .from('profiles')
       .update(updates)
@@ -132,9 +134,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data as Profile);
   };
 
+  const uploadProfileAvatar = async (file: File) => {
+    if (!user) throw new Error('Not authenticated');
+    if (!file.type.includes('png') && !file.type.includes('jpeg') && !file.type.includes('jpg')) {
+      throw new Error('Only PNG/JPG supported')
+    }
+    const ext = file.type.includes('png') ? 'png' : 'jpg'
+    const path = `${user.id}/avatar-${Date.now()}.${ext}`
+    const { error } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { cacheControl: '3600', upsert: true, contentType: file.type })
+    if (error) throw error
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    await updateProfile({ avatar: data.publicUrl })
+  };
+
   const updateWorkspace = async (updates: Partial<Workspace>) => {
     // Admin-only in DB via RLS; this call will fail for non-admins
-    // Fetch existing row
     const existing = await supabase.from('org').select('id').limit(1).maybeSingle()
     const payload: any = {}
     if (updates.name !== undefined) payload.org_name = updates.name
@@ -147,9 +163,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await supabase.from('org').insert(payload).select('org_name, org_logo').single()
       data = res.data; error = res.error
     }
-    if (!error && data) {
+    if (error) throw error
+    if (data) {
       setWorkspace({ name: data.org_name || workspace.name, logo: data.org_logo || workspace.logo })
     }
+  };
+
+  const uploadWorkspaceLogo = async (file: File) => {
+    if (!file.type.includes('png')) throw new Error('Only PNG supported')
+    const path = `logo-${Date.now()}.png`
+    const { error } = await supabase.storage.from('org').upload(path, file, { cacheControl: '3600', upsert: true, contentType: 'image/png' })
+    if (error) throw error
+    const { data } = supabase.storage.from('org').getPublicUrl(path)
+    await updateWorkspace({ logo: data.publicUrl })
   };
 
   return (
@@ -160,7 +186,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signup,
       logout,
       updateProfile,
+      uploadProfileAvatar,
       updateWorkspace,
+      uploadWorkspaceLogo,
       isAdmin: user?.role === 'admin'
     }}>
       {children}

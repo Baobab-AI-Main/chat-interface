@@ -2,9 +2,15 @@ create table if not exists public.profiles (
   id uuid primary key,
   email text unique not null,
   role text not null default 'user',
+  name text,
+  avatar text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Backfill columns if table already exists
+alter table public.profiles add column if not exists name text;
+alter table public.profiles add column if not exists avatar text;
 
 alter table public.profiles enable row level security;
 
@@ -13,7 +19,7 @@ drop policy if exists profiles_update_own on public.profiles;
 drop policy if exists profiles_admin_read_all on public.profiles;
 create policy profiles_read_own on public.profiles for select using (auth.uid() = id);
 create policy profiles_update_own on public.profiles for update using (auth.uid() = id);
-create policy profiles_admin_read_all on public.profiles for select to authenticated using (((current_setting('request.jwt.claims', true)::jsonb)->>'role') = 'admin');
+create policy profiles_admin_read_all on public.profiles for select to authenticated using (exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin'));
 
 insert into public.profiles (id,email,role) values
   ('f8fae3b9-a4ce-4f5c-907b-7314011d1214','team@niya.ai','admin')
