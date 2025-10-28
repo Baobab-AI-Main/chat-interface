@@ -15,7 +15,11 @@ interface Workspace {
 }
 
 async function fetchOrgOnce() {
-  const { data } = await supabase.from('org').select('org_name, org_logo').limit(1).single()
+  const { data } = await supabase
+    .from('org')
+    .select('org_name, org_logo')
+    .limit(1)
+    .maybeSingle()
   return data as { org_name?: string; org_logo?: string } | null
 }
 

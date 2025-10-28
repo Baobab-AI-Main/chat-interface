@@ -14,9 +14,13 @@ export function useOrg() {
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase.from('org').select('org_name, org_logo').limit(1).single()
+        const { data, error } = await supabase
+          .from('org')
+          .select('org_name, org_logo')
+          .limit(1)
+          .maybeSingle()
         if (error) throw error
-        setOrg(data as Org)
+        if (data) setOrg(data as Org)
       } catch (e: any) {
         setError(e.message)
       } finally {
@@ -26,7 +30,11 @@ export function useOrg() {
   }, [])
 
   const updateOrg = async (patch: Partial<Org>) => {
-    const { data, error } = await supabase.from('org').upsert(patch).select('org_name, org_logo').single()
+    const { data, error } = await supabase
+      .from('org')
+      .upsert(patch)
+      .select('org_name, org_logo')
+      .single()
     if (error) throw error
     setOrg(data as Org)
   }

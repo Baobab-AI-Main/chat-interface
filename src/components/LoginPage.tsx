@@ -20,7 +20,11 @@ export function LoginPage() {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase.from('org').select('org_name, org_logo').limit(1).single();
+        const { data } = await supabase
+          .from('org')
+          .select('org_name, org_logo')
+          .limit(1)
+          .maybeSingle();
         if (data) {
           setOrgLogo((data as any).org_logo || null);
           setOrgName((data as any).org_name || '');

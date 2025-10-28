@@ -20,7 +20,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettingsClick, onTeamManagementClick }: SidebarProps) {
-  const { workspace, logout } = useAuth();
+  const { user, workspace, logout } = useAuth();
 
   return (
     <div className="w-64 bg-card border-r flex flex-col h-full">
