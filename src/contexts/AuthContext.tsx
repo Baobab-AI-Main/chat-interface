@@ -7,6 +7,7 @@ export interface Profile {
   role: 'admin' | 'user';
   name?: string | null;
   avatar?: string | null;
+  user_id?: string | null;
 }
 
 interface Workspace {
@@ -57,27 +58,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const fetchProfile = async (uid: string) => {
+    // Load from public.users by auth uid mapping
     const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', uid)
-      .single();
+      .from('users')
+      .select('id, email, role, "Full Name", "Profile_Photo", user_id')
+      .eq('user_id', uid)
+      .maybeSingle();
     if (error) throw error;
-    setUser(data as Profile);
+    if (data) {
+      const p: Profile = {
+        id: (data as any).id,
+        email: (data as any).email,
+        role: (data as any).role,
+        name: (data as any)["Full Name"] || null,
+        avatar: (data as any)["Profile_Photo"] || null,
+        user_id: (data as any).user_id || null
+      }
+      setUser(p);
+    } else {
+      // Create a row bound to this auth user if missing (email from session)
+      const s = (await supabase.auth.getSession()).data.session
+      const email = s?.user?.email || ''
+      const ins = await supabase.from('users').insert({ user_id: uid, email, role: 'user' }).select('id, email, role, "Full Name", "Profile_Photo", user_id').single()
+      if (ins.error) throw ins.error
+      const d: any = ins.data
+      setUser({ id: d.id, email: d.email, role: d.role, name: d["Full Name"] || null, avatar: d["Profile_Photo"] || null, user_id: d.user_id || null })
+    }
   };
 
   const setFromSessionFallback = async () => {
     const { data } = await supabase.auth.getSession();
     const s = data.session;
     if (s?.user) {
-      const fallback: Profile = {
-        id: s.user.id,
-        email: s.user.email || '',
-        role: (s.user.user_metadata?.role as 'admin' | 'user') || 'user',
-        name: s.user.user_metadata?.name || null,
-        avatar: s.user.user_metadata?.avatar || null,
-      };
-      setUser(fallback);
+      try {
+        await fetchProfile(s.user.id)
+      } catch {
+        setUser({ id: s.user.id, email: s.user.email || '', role: 'user', name: null, avatar: null, user_id: s.user.id })
+      }
     } else {
       setUser(null);
     }
@@ -124,14 +141,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) throw new Error('Not authenticated');
+    const payload: any = {}
+    if (updates.name !== undefined) payload['Full Name'] = updates.name
+    if (updates.avatar !== undefined) payload['Profile_Photo'] = updates.avatar
     const { error, data } = await supabase
-      .from('profiles')
-      .update(updates)
+      .from('users')
+      .update(payload)
       .eq('id', user.id)
-      .select()
+      .select('id, email, role, "Full Name", "Profile_Photo", user_id')
       .single();
     if (error) throw error;
-    setUser(data as Profile);
+    const d: any = data
+    setUser({ id: d.id, email: d.email, role: d.role, name: d['Full Name'] || null, avatar: d['Profile_Photo'] || null, user_id: d.user_id || null });
   };
 
   const uploadProfileAvatar = async (file: File) => {
@@ -150,22 +171,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateWorkspace = async (updates: Partial<Workspace>) => {
-    // Admin-only in DB via RLS; this call will fail for non-admins
-    const existing = await supabase.from('org').select('id').limit(1).maybeSingle()
-    const payload: any = {}
-    if (updates.name !== undefined) payload.org_name = updates.name
-    if (updates.logo !== undefined) payload.org_logo = updates.logo
-    let data: any = null; let error: any = null
-    if (existing.data?.id) {
-      const res = await supabase.from('org').update(payload).eq('id', existing.data.id).select('org_name, org_logo').single()
-      data = res.data; error = res.error
-    } else {
-      const res = await supabase.from('org').insert(payload).select('org_name, org_logo').single()
-      data = res.data; error = res.error
-    }
+    // Use SECURITY DEFINER function to bypass RLS for admins only
+    const { error, data } = await supabase.rpc('upsert_org', {
+      p_name: updates.name ?? null,
+      p_logo: updates.logo ?? null,
+    })
     if (error) throw error
     if (data) {
-      setWorkspace({ name: data.org_name || workspace.name, logo: data.org_logo || workspace.logo })
+      setWorkspace({ name: (data as any).org_name || workspace.name, logo: (data as any).org_logo || workspace.logo })
     }
   };
 

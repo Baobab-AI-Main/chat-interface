@@ -10,7 +10,7 @@ import { Badge } from './ui/badge';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { useTeams } from '../hooks/useTeams';
+import { useUsers } from '../hooks/useUsers';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -19,13 +19,30 @@ interface SettingsDialogProps {
 
 // Team management uses live data via Supabase (see useTeams)
 
+function CreateUserInline({ onCreate }: { onCreate: (p: { fullName: string; email: string; role: 'admin'|'user' }) => Promise<void> | void }){
+  const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
+  const [role, setRole] = useState<'admin'|'user'>('user')
+  return (
+    <div className="flex gap-2">
+      <Input placeholder="Full name" value={fullName} onChange={(e)=>setFullName(e.target.value)} />
+      <Input placeholder="Email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} />
+      <select className="border rounded px-2 text-sm" value={role} onChange={(e)=>setRole(e.target.value as any)}>
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+      <Button className="bg-black hover:bg-gray-800" onClick={async ()=>{ if(fullName && email){ await onCreate({ fullName, email, role }); setFullName(''); setEmail(''); setRole('user') } }}>Create</Button>
+    </div>
+  )
+}
+
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { user, workspace, updateProfile, uploadProfileAvatar, updateWorkspace, uploadWorkspaceLogo, isAdmin } = useAuth();
   const [profileName, setProfileName] = useState(user?.name || '');
   const [profileEmail, setProfileEmail] = useState(user?.email || '');
   const [workspaceName, setWorkspaceName] = useState(workspace.name);
 
-  const { teams, loading, error, createTeam, updateTeam, deleteTeam } = useTeams(isAdmin)
+  const { users, loading, error, createUser, deleteUser, updateUser } = useUsers()
 
   const handleProfileSave = async () => {
     try {
@@ -120,7 +137,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     id="profile-email"
                     type="email"
                     value={profileEmail}
-                    onChange={(e) => setProfileEmail(e.target.value)}
+                    disabled
                   />
                 </div>
 
@@ -144,25 +161,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <TabsContent value="team" className="space-y-4 mt-0">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="font-medium">Teams</h3>
+                  <h3 className="font-medium">Users</h3>
                   <p className="text-sm text-muted-foreground">
-                    Create and manage teams
+                    Add or remove users with roles
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <Input placeholder="New team name" onKeyDown={async (e)=>{
-                    const el = e.currentTarget as HTMLInputElement
-                    if(e.key==='Enter' && el.value.trim()){
-                      try { await createTeam(el.value.trim()); el.value='' } catch(e:any){ toast(e.message||String(e)) }
-                    }
-                  }} />
-                  <Button className="bg-black hover:bg-gray-800" onClick={async ()=>{
-                    const input = (document.activeElement as HTMLInputElement)
-                    if (input && input.tagName==='INPUT' && input.value.trim()){
-                      try { await createTeam(input.value.trim()); input.value='' } catch(e:any){ toast(e.message||String(e)) }
-                    }
-                  }}>Create</Button>
-                </div>
+                <CreateUserInline onCreate={async (payload)=>{
+                  try { await createUser(payload.email, payload.fullName, payload.role) } catch(e:any){ toast(e.message||String(e)) }
+                }} />
               </div>
 
               {error && <div className="text-sm text-red-600">{error}</div>}
@@ -171,7 +177,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
+                      <TableHead>Full Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -179,25 +187,29 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     {loading && (
                       <TableRow><TableCell colSpan={2}>Loading...</TableCell></TableRow>
                     )}
-                    {!loading && teams.map((t) => (
-                      <TableRow key={t.id}>
+                    {!loading && users.map((u) => (
+                      <TableRow key={u.id}>
                         <TableCell>
-                          <Input defaultValue={t.name} onBlur={async (e)=>{
+                          <Input defaultValue={u.fullName || ''} onBlur={async (e)=>{
                             const v=e.currentTarget.value.trim();
-                            if (v && v!==t.name){ try{ await updateTeam(t.id, v)} catch(e:any){ toast(e.message||String(e)) } }
+                            if (v && v!==u.fullName){ try{ await updateUser(u.id, { fullName: v }) } catch(e:any){ toast(e.message||String(e)) } }
                           }} />
+                        </TableCell>
+                        <TableCell>{u.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">{u.role}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" onClick={async ()=>{
-                            try { await deleteTeam(t.id) } catch(e:any){ toast(e.message||String(e)) }
+                            try { await deleteUser(u.id) } catch(e:any){ toast(e.message||String(e)) }
                           }}>
                             <Trash2 className="w-4 h-4 text-red-500" />
                           </Button>
                         </TableCell>
                       </TableRow>
                     ))}
-                    {!loading && teams.length===0 && (
-                      <TableRow><TableCell colSpan={2} className="text-muted-foreground">No teams yet</TableCell></TableRow>
+                    {!loading && users.length===0 && (
+                      <TableRow><TableCell colSpan={4} className="text-muted-foreground">No users yet</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
