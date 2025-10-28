@@ -16,10 +16,11 @@ interface SidebarProps {
   searchHistory: SearchHistoryItem[];
   onSelectSearch: (searchId: string) => void;
   onSettingsClick: () => void;
+  onTeamManagementClick?: () => void;
 }
 
-export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettingsClick }: SidebarProps) {
-  const { user, workspace, logout } = useAuth();
+export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettingsClick, onTeamManagementClick }: SidebarProps) {
+  const { workspace, logout } = useAuth();
 
   return (
     <div className="w-64 bg-card border-r flex flex-col h-full">
@@ -28,15 +29,19 @@ export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettings
         <div className="flex items-center gap-2 mb-4">
           <img src={workspace.logo} alt={workspace.name} className="h-8" />
         </div>
-        <div className="text-sm text-muted-foreground mb-2">{workspace.name}</div>
-        <Button 
-          onClick={onNewSearch}
-          className="w-full bg-black text-white hover:bg-gray-800 rounded-full"
-          size="sm"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          New Search
-        </Button>
+        <div className="text-sm text-muted-foreground mb-2">
+          {workspace.name}
+        </div>
+        <div className="space-y-2">
+          <Button 
+            onClick={onNewSearch}
+            className="w-full bg-black text-white hover:bg-gray-800 rounded-full"
+            size="sm"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            New Search
+          </Button>
+        </div>
       </div>
 
       {/* Search History */}

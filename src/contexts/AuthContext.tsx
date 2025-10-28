@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 
-interface User {
+export interface Profile {
   id: string;
-  name: string;
   email: string;
   role: 'admin' | 'user';
-  avatar?: string;
+  name?: string | null;
+  avatar?: string | null;
 }
 
 interface Workspace {
@@ -13,12 +14,18 @@ interface Workspace {
   logo: string;
 }
 
+async function fetchOrgOnce() {
+  const { data } = await supabase.from('org').select('org_name, org_logo').limit(1).single()
+  return data as { org_name?: string; org_logo?: string } | null
+}
+
 interface AuthContextType {
-  user: User | null;
+  user: Profile | null;
   workspace: Workspace;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  updateProfile: (updates: Partial<User>) => void;
+  signup: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  updateProfile: (updates: Partial<Profile>) => Promise<void>;
   updateWorkspace: (updates: Partial<Workspace>) => void;
   isAdmin: boolean;
 }
@@ -30,83 +37,115 @@ const DEFAULT_WORKSPACE: Workspace = {
   logo: 'figma:asset/2a8790cd130a03ff81ea4aec63fd5860503e90bf.png'
 };
 
-// Mock users for demo
-const MOCK_USERS = [
-  {
-    id: '1',
-    name: 'John Doe',
-    email: 'admin@brunel.com',
-    password: 'admin123',
-    role: 'admin' as const,
-    avatar: undefined
-  },
-  {
-    id: '2',
-    name: 'Jane Smith',
-    email: 'user@brunel.com',
-    password: 'user123',
-    role: 'user' as const,
-    avatar: undefined
-  }
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
   const [workspace, setWorkspace] = useState<Workspace>(DEFAULT_WORKSPACE);
 
+  const loadWorkspaceFromOrg = async () => {
+    try {
+      const org = await fetchOrgOnce()
+      if (org) {
+        setWorkspace({ name: org.org_name || DEFAULT_WORKSPACE.name, logo: org.org_logo || DEFAULT_WORKSPACE.logo })
+      }
+    } catch {}
+  }
+
+  const fetchProfile = async (uid: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', uid)
+      .single();
+    if (error) throw error;
+    setUser(data as Profile);
+  };
+
+  const setFromSessionFallback = async () => {
+    const { data } = await supabase.auth.getSession();
+    const s = data.session;
+    if (s?.user) {
+      const fallback: Profile = {
+        id: s.user.id,
+        email: s.user.email || '',
+        role: (s.user.user_metadata?.role as 'admin' | 'user') || 'user',
+        name: s.user.user_metadata?.name || null,
+        avatar: s.user.user_metadata?.avatar || null,
+      };
+      setUser(fallback);
+    } else {
+      setUser(null);
+    }
+  };
+
   useEffect(() => {
-    // Check for saved auth on mount
-    const savedUser = localStorage.getItem('brunelai_user');
-    const savedWorkspace = localStorage.getItem('brunelai_workspace');
-    
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    if (savedWorkspace) {
-      setWorkspace(JSON.parse(savedWorkspace));
-    }
+    // restore session
+    supabase.auth.getSession().then(({ data }) => {
+      const s = data.session;
+      if (s?.user) fetchProfile(s.user.id).catch(() => setFromSessionFallback());
+    });
+
+    // load org/workspace regardless of auth
+    loadWorkspaceFromOrg();
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) fetchProfile(session.user.id).catch(() => setFromSessionFallback());
+      else setUser(null);
+    });
+    return () => {
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    console.log('Login attempt:', email);
-    
-    // Mock authentication
-    const mockUser = MOCK_USERS.find(u => u.email === email && u.password === password);
-    
-    if (!mockUser) {
-      console.error('Invalid credentials for:', email);
-      throw new Error('Invalid credentials');
-    }
-
-    console.log('User found:', mockUser.name);
-    const { password: _, ...userWithoutPassword } = mockUser;
-    setUser(userWithoutPassword);
-    
-    try {
-      localStorage.setItem('brunelai_user', JSON.stringify(userWithoutPassword));
-      console.log('User saved to localStorage');
-    } catch (storageError) {
-      console.error('localStorage error:', storageError);
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    if (data.user) {
+      try { await fetchProfile(data.user.id); }
+      catch { await setFromSessionFallback(); }
     }
   };
 
-  const logout = () => {
+  const signup = async (email: string, password: string) => {
+    const { error, data } = await supabase.auth.signUp({ email, password, options: { data: { role: 'user' } } });
+    if (error) throw error;
+    if (data.user) await fetchProfile(data.user.id);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('brunelai_user');
   };
 
-  const updateProfile = (updates: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...updates };
-      setUser(updatedUser);
-      localStorage.setItem('brunelai_user', JSON.stringify(updatedUser));
+  const updateProfile = async (updates: Partial<Profile>) => {
+    if (!user) return;
+    const { error, data } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', user.id)
+      .select()
+      .single();
+    if (error) throw error;
+    setUser(data as Profile);
+  };
+
+  const updateWorkspace = async (updates: Partial<Workspace>) => {
+    // Admin-only in DB via RLS; this call will fail for non-admins
+    // Fetch existing row
+    const existing = await supabase.from('org').select('id').limit(1).maybeSingle()
+    const payload: any = {}
+    if (updates.name !== undefined) payload.org_name = updates.name
+    if (updates.logo !== undefined) payload.org_logo = updates.logo
+    let data: any = null; let error: any = null
+    if (existing.data?.id) {
+      const res = await supabase.from('org').update(payload).eq('id', existing.data.id).select('org_name, org_logo').single()
+      data = res.data; error = res.error
+    } else {
+      const res = await supabase.from('org').insert(payload).select('org_name, org_logo').single()
+      data = res.data; error = res.error
     }
-  };
-
-  const updateWorkspace = (updates: Partial<Workspace>) => {
-    const updatedWorkspace = { ...workspace, ...updates };
-    setWorkspace(updatedWorkspace);
-    localStorage.setItem('brunelai_workspace', JSON.stringify(updatedWorkspace));
+    if (!error && data) {
+      setWorkspace({ name: data.org_name || workspace.name, logo: data.org_logo || workspace.logo })
+    }
   };
 
   return (
@@ -114,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       workspace,
       login,
+      signup,
       logout,
       updateProfile,
       updateWorkspace,

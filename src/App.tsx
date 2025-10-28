@@ -9,6 +9,7 @@ import { SettingsDialog } from "./components/SettingsDialog";
 import { ScrollArea } from "./components/ui/scroll-area";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/sonner";
+import { TeamManagement } from "./components/TeamManagement";
 
 interface ChatMessage {
   id: string;
@@ -129,6 +130,7 @@ function AppContent() {
 
   const [selectedInvestor, setSelectedInvestor] = useState<any>(mockInvestors[0]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showTeams, setShowTeams] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const handleSendMessage = (content: string) => {
@@ -195,45 +197,50 @@ function AppContent() {
       <div className="h-screen flex bg-background">
         {/* Left Sidebar */}
         <Sidebar 
-          onNewSearch={handleNewSearch}
+          onNewSearch={() => { setShowTeams(false); handleNewSearch(); }}
           searchHistory={searchHistory}
           onSelectSearch={(searchId) => console.log('Selected search:', searchId)}
           onSettingsClick={() => setSettingsOpen(true)}
+          onTeamManagementClick={() => setShowTeams(true)}
         />
         
-        {/* Main Chat Area - More Centered */}
+        {/* Main Area */}
         <div className="flex-1 flex flex-col items-center">
           <div className="w-full max-w-5xl flex flex-col h-full">
-            <ChatHeader 
-              searchTitle="LATAM Infrastructure Investors"
-              isConnected={true}
-              connectionSource="LinkedIn"
-            />
-            
-            <ScrollArea ref={scrollAreaRef} className="flex-1 h-0">
-              <div className="p-6 space-y-1">
-                {messages.map((message) => (
-                  <Message
-                    key={message.id}
-                    content={message.content}
-                    isUser={message.isUser}
-                    timestamp={message.timestamp}
-                    senderName={message.senderName}
-                    senderAvatar={message.senderAvatar}
-                    searchQuery={message.searchQuery}
-                    candidates={message.candidates}
-                    onInvestorClick={handleInvestorClick}
-                  />
-                ))}
-              </div>
-            </ScrollArea>
-
-            <ChatInput onSendMessage={handleSendMessage} />
+            {!showTeams ? (
+              <>
+                <ChatHeader 
+                  searchTitle="LATAM Infrastructure Investors"
+                  isConnected={true}
+                  connectionSource="LinkedIn"
+                />
+                <ScrollArea ref={scrollAreaRef} className="flex-1 h-0">
+                  <div className="p-6 space-y-1">
+                    {messages.map((message) => (
+                      <Message
+                        key={message.id}
+                        content={message.content}
+                        isUser={message.isUser}
+                        timestamp={message.timestamp}
+                        senderName={message.senderName}
+                        senderAvatar={message.senderAvatar}
+                        searchQuery={message.searchQuery}
+                        candidates={message.candidates}
+                        onInvestorClick={handleInvestorClick}
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
+                <ChatInput onSendMessage={handleSendMessage} />
+              </>
+            ) : (
+              <TeamManagement onClose={() => setShowTeams(false)} />
+            )}
           </div>
         </div>
 
         {/* Right Sidebar - Investor Profile */}
-        {selectedInvestor && (
+        {!showTeams && selectedInvestor && (
           <InvestorProfile 
             investor={selectedInvestor}
             onClose={() => setSelectedInvestor(null)}

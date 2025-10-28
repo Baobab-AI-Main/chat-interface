@@ -193,12 +193,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       <img src={workspace.logo} alt="Workspace logo" className="h-12 object-contain" />
                     </div>
                     <div className="flex-1">
-                      <Button variant="outline" size="sm" onClick={handleLogoUpload}>
-                        <Upload className="w-4 h-4 mr-2" />
-                        Upload Logo
-                      </Button>
+                      <label className="inline-flex items-center gap-2 text-sm">
+                        <input type="file" accept="image/png" onChange={(e)=>handleLogoUpload(e.target.files?.[0]||undefined)} />
+                        <Upload className="w-4 h-4" /> PNG only
+                      </label>
                       <p className="text-xs text-muted-foreground mt-2">
-                        Recommended size: 200x200px. PNG or SVG format.
+                        Recommended size: 200x200px. PNG format.
                       </p>
                     </div>
                   </div>
