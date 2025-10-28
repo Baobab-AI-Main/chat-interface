@@ -60,6 +60,7 @@
             "preview": "vite preview",
             "playwright:install": "playwright install",
             "health": "node scripts/playwright-check.js",
-            "test:e2e": "playwright test"
+            "test:e2e": "playwright test",
+            "seed:org": "node scripts/seed-org.js"
       }
 }
