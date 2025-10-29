@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ChangeEvent } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
@@ -26,6 +26,10 @@ function CreateUserInline({ onCreate }: { onCreate: (p: { fullName: string; emai
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'admin'|'user'>('user')
+
+  const handleRoleChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setRole(event.target.value as 'admin' | 'user')
+  }
   
   const handleCreate = async () => {
     if (fullName && email) {
@@ -40,11 +44,11 @@ function CreateUserInline({ onCreate }: { onCreate: (p: { fullName: string; emai
   
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex gap-2">
-        <Input placeholder="Full name" value={fullName} onChange={(e)=>setFullName(e.target.value)} />
-        <Input placeholder="Email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} />
-        <Input placeholder="Password (optional)" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-40" />
-        <select className="border rounded px-2 text-sm" value={role} onChange={(e)=>setRole(e.target.value as any)}>
+      <div className="flex flex-wrap gap-2">
+        <Input placeholder="Full name" value={fullName} onChange={(e)=>setFullName(e.target.value)} className="min-w-[160px] flex-1" />
+        <Input placeholder="Email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} className="min-w-[200px] flex-1" />
+        <Input placeholder="Password (optional)" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-48" />
+  <select className="border rounded px-2 text-sm h-10" value={role} onChange={handleRoleChange}>
           <option value="user">User</option>
           <option value="admin">Admin</option>
         </select>
@@ -206,8 +210,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
             {isAdmin && (
               <TabsContent value="team" className="space-y-4 mt-0">
-                <div className="flex justify-between items-center">
-                  <div>
+                <div className="space-y-4">
+                  <div className="space-y-1">
                     <h3 className="font-medium">Users</h3>
                     <p className="text-sm text-muted-foreground">
                       Add or remove users with roles
