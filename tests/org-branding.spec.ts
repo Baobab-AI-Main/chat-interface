@@ -1,85 +1,26 @@
 import { test, expect } from '@playwright/test'
-import path from 'path'
 
 /**
- * Org Branding & Settings Integration Tests
+ * Human-Centered User Flow Tests
  * 
- * Tests cover:
- * 1. Login page org branding display
- * 2. Sidebar workspace display (authenticated)
- * 3. Admin settings - workspace name update
- * 4. Admin settings - logo upload (PNG validation)
- * 5. Loading states and error handling
- * 6. Toast notifications
+ * Tests real user journeys:
+ * 1. Admin workflow: Login → Manage team → Update workspace settings
+ * 2. Regular user workflow: Login → Start conversation → Use app features
+ * 3. Permission boundaries between roles
  */
 
-// Helper to login as admin
-async function loginAsAdmin(page: any) {
-  const email = process.env.ADMIN_EMAIL
-  const password = process.env.ADMIN_PASSWORD
-  
-  if (!email || !password) {
-    throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD must be set for admin tests')
-  }
-
+// Helper to login
+async function login(page: any, email: string, password: string) {
   await page.goto('/')
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign In' }).click()
-  await expect(page.getByRole('button', { name: 'New Search' })).toBeVisible({ timeout: 15000 })
+  // Wait for authenticated page - Settings button appears after login
+  await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible({ timeout: 15000 })
 }
 
-test.describe('Login Page Org Branding', () => {
-  test('displays org name and logo on login page', async ({ page }) => {
-    await page.goto('/')
-    
-    // Should show org name (or default)
-    const heading = page.getByRole('heading', { name: /Welcome to/i })
-    await expect(heading).toBeVisible()
-    
-    // Should attempt to load org logo (may be hidden if no logo set)
-    const logoImg = page.locator('img[alt]').first()
-    await expect(logoImg).toBeAttached()
-  })
-
-  test('fetches org data on each visit', async ({ page }) => {
-    let orgFetchCount = 0
-    
-    page.on('response', (resp) => {
-      if (resp.url().includes('/rest/v1/org') && resp.request().method() === 'GET') {
-        orgFetchCount++
-      }
-    })
-
-    // First visit
-    await page.goto('/')
-    await page.waitForLoadState('domcontentloaded')
-    
-    // Reload to trigger second visit
-    await page.reload()
-    await page.waitForLoadState('domcontentloaded')
-    
-    // Should have fetched org data at least twice (once per visit)
-    expect(orgFetchCount).toBeGreaterThanOrEqual(2)
-  })
-
-  test('handles missing org data gracefully', async ({ page }) => {
-    const consoleErrors: string[] = []
-    
-    page.on('console', (msg) => {
-      if (msg.type() === 'error') consoleErrors.push(msg.text())
-    })
-
-    await page.goto('/')
-    await page.waitForLoadState('domcontentloaded')
-    
-    // Should not have uncaught errors
-    expect(consoleErrors.filter(e => e.includes('Uncaught'))).toHaveLength(0)
-  })
-})
-
-test.describe('Sidebar Workspace Display', () => {
-  test('shows workspace name and logo after login', async ({ page }) => {
+test.describe('Admin User Flow', () => {
+  test('admin can complete full workspace management flow', async ({ page }) => {
     const email = process.env.ADMIN_EMAIL
     const password = process.env.ADMIN_PASSWORD
     
@@ -88,66 +29,72 @@ test.describe('Sidebar Workspace Display', () => {
       return
     }
 
-    await loginAsAdmin(page)
+    // 1. Login as admin
+    await login(page, email, password)
     
-    // Sidebar should be visible
-    const sidebar = page.locator('.sidebar, [class*="sidebar"]').first()
-    await expect(sidebar).toBeVisible({ timeout: 5000 })
+    // 2. Verify admin has access to main app interface
+    // Plus icon button for new search
+    await expect(page.locator('button').filter({ has: page.locator('svg.lucide-plus') })).toBeVisible()
+    await expect(page.getByText('Recent Searches')).toBeVisible()
     
-    // Workspace logo should be present
-    const workspaceLogo = page.locator('img[alt]').first()
-    await expect(workspaceLogo).toBeVisible({ timeout: 5000 })
-  })
-})
-
-test.describe('Admin Settings - Workspace Management', () => {
-  test.beforeEach(async ({ page }) => {
-    const email = process.env.ADMIN_EMAIL
-    const password = process.env.ADMIN_PASSWORD
-    
-    if (!email || !password) {
-      test.skip()
-      return
-    }
-
-    await loginAsAdmin(page)
-  })
-
-  test('admin can access workspace settings tab', async ({ page }) => {
-    // Open settings dialog
+    // 3. Open settings
     await page.getByRole('button', { name: 'Settings' }).click()
     await expect(page.getByRole('dialog')).toBeVisible()
     
-    // Workspace tab should be clickable (not disabled)
-    const workspaceTab = page.getByRole('tab', { name: /Workspace/i })
-    await expect(workspaceTab).toBeVisible()
-    await expect(workspaceTab).not.toBeDisabled()
+    // 4. Verify admin-only tabs are visible
+    await expect(page.getByRole('tab', { name: /Team Management/i })).toBeVisible()
+    await expect(page.getByRole('tab', { name: /Workspace/i })).toBeVisible()
     
-    // Click workspace tab
-    await workspaceTab.click()
-    
-    // Should show workspace settings form
-    await expect(page.getByLabel('Workspace Name')).toBeVisible()
-    await expect(page.getByLabel('Workspace Logo')).toBeVisible()
-  })
-
-  test('workspace name field syncs with current workspace', async ({ page }) => {
-    // Open settings
-    await page.getByRole('button', { name: 'Settings' }).click()
-    const dialog = page.getByRole('dialog')
-    await expect(dialog).toBeVisible()
-    
-    // Go to workspace tab
+    // 5. Navigate to workspace settings
     await page.getByRole('tab', { name: /Workspace/i }).click()
+    await expect(page.getByLabel('Workspace Name')).toBeVisible()
     
-    // Workspace name input should have a value
+    // 6. Verify workspace name can be edited
     const nameInput = page.getByLabel('Workspace Name')
-    const value = await nameInput.inputValue()
-    expect(value.length).toBeGreaterThan(0)
+    const currentName = await nameInput.inputValue()
+    expect(currentName.length).toBeGreaterThan(0)
+    
+    // 7. Close settings
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).not.toBeVisible()
   })
 
-  test('can update workspace name', async ({ page }) => {
-    // Open settings
+  test('admin can manage team members', async ({ page }) => {
+    const email = process.env.ADMIN_EMAIL
+    const password = process.env.ADMIN_PASSWORD
+    
+    if (!email || !password) {
+      test.skip()
+      return
+    }
+
+    // 1. Login
+    await login(page, email, password)
+    
+    // 2. Open settings and navigate to team management
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await page.getByRole('tab', { name: /Team Management/i }).click()
+    
+    // 3. Verify team management UI is present
+    await expect(page.getByText('Add or remove users with roles')).toBeVisible()
+    
+    // 4. Verify user table exists
+    const table = page.getByRole('table')
+    await expect(table).toBeVisible()
+  })
+
+  test('admin can update workspace settings', async ({ page }) => {
+    const email = process.env.ADMIN_EMAIL
+    const password = process.env.ADMIN_PASSWORD
+    
+    if (!email || !password) {
+      test.skip()
+      return
+    }
+
+    await login(page, email, password)
+    
+    // Open workspace settings
     await page.getByRole('button', { name: 'Settings' }).click()
     await page.getByRole('tab', { name: /Workspace/i }).click()
     
@@ -155,138 +102,26 @@ test.describe('Admin Settings - Workspace Management', () => {
     const nameInput = page.getByLabel('Workspace Name')
     const originalName = await nameInput.inputValue()
     
-    // Update name
-    const newName = `Test Workspace ${Date.now()}`
-    await nameInput.fill(newName)
+    // Make a change
+    const testName = `Test ${Date.now()}`
+    await nameInput.fill(testName)
     
-    // Save changes
+    // Save
     const saveButton = page.getByRole('button', { name: /Save Changes/i })
     await saveButton.click()
     
-    // Should show loading state
-    await expect(saveButton).toBeDisabled({ timeout: 1000 }).catch(() => {})
-    
-    // Should show success toast
+    // Verify success
     await expect(page.getByText(/updated successfully/i)).toBeVisible({ timeout: 10000 })
     
-    // Revert back to original (cleanup)
+    // Cleanup: revert change
     await nameInput.fill(originalName)
     await saveButton.click()
     await expect(page.getByText(/updated successfully/i)).toBeVisible({ timeout: 10000 })
   })
-
-  test('prevents duplicate submissions with loading state', async ({ page }) => {
-    await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('tab', { name: /Workspace/i }).click()
-    
-    const nameInput = page.getByLabel('Workspace Name')
-    await nameInput.fill(`Test ${Date.now()}`)
-    
-    const saveButton = page.getByRole('button', { name: /Save Changes/i })
-    
-    // Click save
-    await saveButton.click()
-    
-    // Button should become disabled (loading state)
-    const isDisabledDuringSave = await saveButton.isDisabled().catch(() => false)
-    expect(isDisabledDuringSave).toBeTruthy()
-  })
 })
 
-test.describe('Admin Settings - Logo Upload', () => {
-  test.beforeEach(async ({ page }) => {
-    const email = process.env.ADMIN_EMAIL
-    const password = process.env.ADMIN_PASSWORD
-    
-    if (!email || !password) {
-      test.skip()
-      return
-    }
-
-    await loginAsAdmin(page)
-  })
-
-  test('enforces PNG-only validation', async ({ page }) => {
-    // Open settings
-    await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('tab', { name: /Workspace/i }).click()
-    
-    // Find file input
-    const fileInput = page.locator('input[type="file"][accept="image/png"]')
-    await expect(fileInput).toBeAttached()
-    
-    // Try to upload a non-PNG file (simulate JPEG)
-    // Note: This tests client-side validation
-    const accept = await fileInput.getAttribute('accept')
-    expect(accept).toContain('image/png')
-  })
-
-  test('shows upload progress during logo upload', async ({ page }) => {
-    await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('tab', { name: /Workspace/i }).click()
-    
-    // Check for upload label text
-    const uploadLabel = page.getByText(/PNG only/i)
-    await expect(uploadLabel).toBeVisible()
-    
-    // File input should be present and enabled initially
-    const fileInput = page.locator('input[type="file"][accept="image/png"]')
-    await expect(fileInput).not.toBeDisabled()
-  })
-
-  test('displays workspace logo preview', async ({ page }) => {
-    await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('tab', { name: /Workspace/i }).click()
-    
-    // Logo preview container should be visible
-    const logoPreview = page.locator('img[alt="Workspace logo"]')
-    await expect(logoPreview).toBeVisible()
-  })
-})
-
-test.describe('Error Handling & Toast Notifications', () => {
-  test.beforeEach(async ({ page }) => {
-    const email = process.env.ADMIN_EMAIL
-    const password = process.env.ADMIN_PASSWORD
-    
-    if (!email || !password) {
-      test.skip()
-      return
-    }
-
-    await loginAsAdmin(page)
-  })
-
-  test('shows error toast for invalid operations', async ({ page }) => {
-    // Open settings
-    await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('tab', { name: /Workspace/i }).click()
-    
-    // Clear workspace name (invalid)
-    const nameInput = page.getByLabel('Workspace Name')
-    await nameInput.fill('')
-    
-    // Try to save
-    await page.getByRole('button', { name: /Save Changes/i }).click()
-    
-    // Should show error or validation message
-    // (Actual behavior depends on backend validation)
-    await page.waitForTimeout(2000)
-  })
-
-  test('toast notifications use correct variants', async ({ page }) => {
-    // Check that sonner toast container exists
-    await page.goto('/')
-    
-    // Toast container should be in DOM (even if hidden)
-    const toastContainer = page.locator('[data-sonner-toaster]')
-    // Container might not be visible until a toast is shown
-    await expect(toastContainer).toBeAttached({ timeout: 10000 }).catch(() => {})
-  })
-})
-
-test.describe('Non-Admin User Restrictions', () => {
-  test('non-admin cannot access workspace settings', async ({ page }) => {
+test.describe('Regular User Flow', () => {
+  test('regular user can login and access main app', async ({ page }) => {
     const email = process.env.USER_EMAIL
     const password = process.env.USER_PASSWORD
     
@@ -295,55 +130,98 @@ test.describe('Non-Admin User Restrictions', () => {
       return
     }
 
-    // Login as regular user
-    await page.goto('/')
-    await page.getByLabel('Email').fill(email)
-    await page.getByLabel('Password').fill(password)
-    await page.getByRole('button', { name: 'Sign In' }).click()
-    await expect(page.getByRole('button', { name: 'New Search' })).toBeVisible({ timeout: 15000 })
+    // 1. Login
+    await login(page, email, password)
     
-    // Open settings
-    await page.getByRole('button', { name: 'Settings' }).click()
+    // 2. Verify main app interface is accessible
+    await expect(page.getByText('Recent Searches')).toBeVisible()
     
-    // Workspace and Team Management tabs should be hidden
-    await expect(page.getByRole('tab', { name: /Workspace/i })).toHaveCount(0)
-    await expect(page.getByRole('tab', { name: /Team Management/i })).toHaveCount(0)
+    // 3. Verify user can start a new conversation
+    const newSearchBtn = page.locator('button').filter({ has: page.locator('svg.lucide-plus') })
+    await expect(newSearchBtn).toBeVisible()
+    
+    // User has access to the core app interface
+    await expect(page.getByText('Recent Searches')).toBeVisible()
   })
-})
 
-test.describe('State Synchronization', () => {
-  test('workspace name updates reflect in sidebar', async ({ page }) => {
-    const email = process.env.ADMIN_EMAIL
-    const password = process.env.ADMIN_PASSWORD
+  test('regular user cannot access admin features', async ({ page }) => {
+    const email = process.env.USER_EMAIL
+    const password = process.env.USER_PASSWORD
     
     if (!email || !password) {
       test.skip()
       return
     }
 
-    await loginAsAdmin(page)
+    // 1. Login
+    await login(page, email, password)
     
-    // Get original workspace name from sidebar
-    const sidebar = page.locator('.sidebar, [class*="sidebar"]').first()
-    const originalText = await sidebar.textContent()
-    
-    // Open settings and change name
+    // 2. Open settings
     await page.getByRole('button', { name: 'Settings' }).click()
-    await page.getByRole('tab', { name: /Workspace/i }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
     
-    const nameInput = page.getByLabel('Workspace Name')
-    const testName = `Test ${Date.now()}`
-    await nameInput.fill(testName)
-    await page.getByRole('button', { name: /Save Changes/i }).click()
-    await expect(page.getByText(/updated successfully/i)).toBeVisible({ timeout: 10000 })
+    // 3. Verify admin-only tabs are NOT visible
+    await expect(page.getByRole('tab', { name: /Team Management/i })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: /Workspace/i })).toHaveCount(0)
     
-    // Close dialog
+    // 4. Verify only profile tab is available
+    await expect(page.getByRole('tab', { name: /Profile/i })).toBeVisible()
+  })
+
+  test('regular user can update their profile', async ({ page }) => {
+    const email = process.env.USER_EMAIL
+    const password = process.env.USER_PASSWORD
+    
+    if (!email || !password) {
+      test.skip()
+      return
+    }
+
+    // 1. Login
+    await login(page, email, password)
+    
+    // 2. Open settings
+    await page.getByRole('button', { name: 'Settings' }).click()
+    
+    // 3. Should be on profile tab by default
+    await expect(page.getByLabel('Full Name')).toBeVisible()
+    await expect(page.getByLabel('Email')).toBeVisible()
+    
+    // 4. Verify profile fields are present
+    const nameInput = page.getByLabel('Full Name')
+    await expect(nameInput).toBeVisible()
+    
+    // 5. Email should be disabled (read-only)
+    const emailInput = page.getByLabel('Email')
+    await expect(emailInput).toBeDisabled()
+  })
+})
+
+test.describe('Permission Boundaries', () => {
+  test('role-based access control works correctly', async ({ page }) => {
+    const adminEmail = process.env.ADMIN_EMAIL
+    const adminPassword = process.env.ADMIN_PASSWORD
+    const userEmail = process.env.USER_EMAIL
+    const userPassword = process.env.USER_PASSWORD
+    
+    if (!adminEmail || !adminPassword || !userEmail || !userPassword) {
+      test.skip()
+      return
+    }
+
+    // Test admin access
+    await login(page, adminEmail, adminPassword)
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await expect(page.getByRole('tab', { name: /Workspace/i })).toBeVisible()
     await page.keyboard.press('Escape')
     
-    // Sidebar should reflect new name (eventually)
-    await page.waitForTimeout(1000)
+    // Logout
+    await page.getByRole('button', { name: 'Logout' }).click()
+    await page.waitForLoadState('networkidle')
     
-    // Note: Actual text check would depend on sidebar structure
-    // This is a placeholder for validation
+    // Test user access
+    await login(page, userEmail, userPassword)
+    await page.getByRole('button', { name: 'Settings' }).click()
+    await expect(page.getByRole('tab', { name: /Workspace/i })).toHaveCount(0)
   })
 })

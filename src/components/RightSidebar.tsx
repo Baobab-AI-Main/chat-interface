@@ -1,7 +1,7 @@
+import { Calendar, ExternalLink, FileText, Package, User, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
-import { Calendar, ExternalLink, FileText, Package, User, DollarSign } from "lucide-react";
 
 export interface SparklayerOrderDetail {
   orderId: string;
@@ -46,8 +46,12 @@ function formatAmount(amount: number) {
 }
 
 export function RightSidebar({ details }: RightSidebarProps) {
+  if (details.length === 0) {
+    return <aside className="w-0 overflow-hidden" aria-hidden="true" />;
+  }
+
   return (
-    <div className="w-80 bg-card border-l flex flex-col h-full">
+    <aside className="w-80 bg-card border-l flex flex-col h-full">
       <div className="p-4 border-b">
         <h2 className="text-sm font-medium text-muted-foreground">Conversation Details</h2>
       </div>
@@ -138,6 +142,6 @@ export function RightSidebar({ details }: RightSidebarProps) {
           ))}
         </div>
       </ScrollArea>
-    </div>
+    </aside>
   );
 }

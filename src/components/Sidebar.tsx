@@ -22,18 +22,18 @@ export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettings
   const { user, workspace, logout } = useAuth();
 
   return (
-    <div className="w-64 bg-card border-r flex flex-col h-full">
+    <div className="w-[18.4rem] bg-card border-r flex flex-col h-full">
       {/* Logo and Header */}
       <div className="p-4 border-b">
         <div className="flex items-center justify-between">
           <img src={workspace.logo} alt={workspace.name} className="h-8" />
-          <Button
-        onClick={onNewSearch}
-        className="rounded bg-black text-white hover:bg-gray-800"
-        size="icon"
-          >
-        <Plus className="w-4 h-4" />
-          </Button>
+            <Button
+            onClick={onNewSearch}
+            className="rounded-[8px] bg-black text-white hover:bg-gray-800"
+            size="icon"
+            >
+            <Plus className="w-4 h-4" />
+            </Button>
         </div>
       </div>
 
