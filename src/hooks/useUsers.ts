@@ -51,13 +51,14 @@ export function useUsers(enabled: boolean = true) {
     fetchUsers()
   }, [enabled, fetchUsers])
 
-  const createUser = async (email: string, fullName: string, role: 'admin'|'user') => {
+  const createUser = async (email: string, fullName: string, role: 'admin'|'user', password: string = `TempPass${Date.now()}!`) => {
     if (!enabled) {
       throw new Error('User management is restricted')
     }
-    // Use admin RPC function
-    const { error, data } = await supabase.rpc('admin_create_user', {
+    // Use admin RPC function that creates both auth and public users
+    const { error, data } = await supabase.rpc('admin_create_user_complete', {
       p_email: email,
+      p_password: password,
       p_role: role,
       p_full_name: fullName
     })

@@ -21,19 +21,36 @@ type SettingsTab = 'profile' | 'team' | 'workspace';
 
 // Team management uses live data via Supabase (see useTeams)
 
-function CreateUserInline({ onCreate }: { onCreate: (p: { fullName: string; email: string; role: 'admin'|'user' }) => Promise<void> | void }){
+function CreateUserInline({ onCreate }: { onCreate: (p: { fullName: string; email: string; role: 'admin'|'user'; password: string }) => Promise<void> | void }){
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [role, setRole] = useState<'admin'|'user'>('user')
+  
+  const handleCreate = async () => {
+    if (fullName && email) {
+      const finalPassword = password || `TempPass${Date.now()}!`
+      await onCreate({ fullName, email, role, password: finalPassword })
+      setFullName('')
+      setEmail('')
+      setPassword('')
+      setRole('user')
+    }
+  }
+  
   return (
-    <div className="flex gap-2">
-      <Input placeholder="Full name" value={fullName} onChange={(e)=>setFullName(e.target.value)} />
-      <Input placeholder="Email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} />
-      <select className="border rounded px-2 text-sm" value={role} onChange={(e)=>setRole(e.target.value as any)}>
-        <option value="user">User</option>
-        <option value="admin">Admin</option>
-      </select>
-      <Button className="bg-black hover:bg-gray-800" onClick={async ()=>{ if(fullName && email){ await onCreate({ fullName, email, role }); setFullName(''); setEmail(''); setRole('user') } }}>Create</Button>
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-2">
+        <Input placeholder="Full name" value={fullName} onChange={(e)=>setFullName(e.target.value)} />
+        <Input placeholder="Email" type="email" value={email} onChange={(e)=>setEmail(e.target.value)} />
+        <Input placeholder="Password (optional)" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-40" />
+        <select className="border rounded px-2 text-sm" value={role} onChange={(e)=>setRole(e.target.value as any)}>
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+        <Button className="bg-black hover:bg-gray-800" onClick={handleCreate}>Create</Button>
+      </div>
+      {!password && <p className="text-xs text-muted-foreground">Leave password empty to auto-generate</p>}
     </div>
   )
 }
@@ -197,7 +214,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </p>
                   </div>
                   <CreateUserInline onCreate={async (payload)=>{
-                    try { await createUser(payload.email, payload.fullName, payload.role) } catch(e:any){ toast(e.message||String(e)) }
+                    try { 
+                      await createUser(payload.email, payload.fullName, payload.role, payload.password)
+                      toast.success('User created successfully in both auth and public tables')
+                    } catch(e:any){ 
+                      toast.error(e.message||String(e)) 
+                    }
                   }} />
                 </div>
 
