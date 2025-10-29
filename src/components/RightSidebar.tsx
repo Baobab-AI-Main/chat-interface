@@ -68,8 +68,6 @@ export function RightSidebar({ details }: RightSidebarProps) {
             <div key={entry.messageId} className="space-y-3">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {formatDate(entry.createdAt)}
-              </div>
-
               {entry.order && (
                 <Card>
                   <CardHeader className="px-4 pt-4 pb-1">
@@ -77,7 +75,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
                       <img
                         src="https://www.sparklayer.io/assets/images/icons/emblem.png"
                         alt="SparkLayer logo"
-                        className="w-5 h-5 object-contain"
+                        className="w-[30px] h-[30px] object-contain"
                       />
                       Sparklayer Order
                     </CardTitle>
@@ -116,7 +114,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
                       <img
                         src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9f/Xero_software_logo.svg/1200px-Xero_software_logo.svg.png"
                         alt="Xero logo"
-                        className="w-5 h-5 object-contain"
+                        className="w-[30px] h-[30px] object-contain"
                       />
                       Xero Invoice
                     </CardTitle>
@@ -147,6 +145,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
                     )}
                   </CardContent>
                 </Card>
+              )}
               )}
             </div>
           ))}
