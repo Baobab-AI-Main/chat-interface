@@ -427,15 +427,18 @@ function AppContent() {
         }
 
         const data = await response.json();
-        if (!isValidAutomationResponse(data)) {
+        const payloadArray = Array.isArray(data) ? data : Array.isArray(data?.output) ? data.output : null;
+        const payloadObject = payloadArray && payloadArray.length > 0 ? payloadArray[0] : data;
+
+        if (!isValidAutomationResponse(payloadObject)) {
           console.error("Unexpected automation payload", data);
           throw new Error("Automation response missing chat_response");
         }
 
         const automationPayload: N8nResponsePayload = {
-          chat_response: data.chat_response,
-          order_from_sparklayer: data.order_from_sparklayer ?? null,
-          invoice_from_xero: data.invoice_from_xero ?? null,
+          chat_response: payloadObject.chat_response,
+          order_from_sparklayer: payloadObject.order_from_sparklayer ?? null,
+          invoice_from_xero: payloadObject.invoice_from_xero ?? null,
         };
 
         const { data: assistantRow, error: assistantError } = await supabase
