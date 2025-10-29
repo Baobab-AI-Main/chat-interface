@@ -46,9 +46,11 @@ export function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
-          <div className="flex justify-center">
-            <img src={orgLogo ?? ''} alt={orgName} className="h-12" onError={(e)=>{(e.currentTarget as HTMLImageElement).style.visibility='hidden'}} />
-          </div>
+          {orgLogo && (
+            <div className="flex justify-center">
+              <img src={orgLogo} alt={orgName} className="h-12" />
+            </div>
+          )}
           <CardTitle>Welcome to {orgName || 'BrunelAI'}</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
