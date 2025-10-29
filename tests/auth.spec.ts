@@ -16,8 +16,9 @@ test('sign in with admin if creds provided', async ({ page }) => {
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign In' }).click()
-  // Validate app shell and admin-only control present
-  await expect(page.getByRole('button', { name: 'New Search' })).toBeVisible({ timeout: 15000 })
-  await expect(page.getByText('Conversation Details')).toBeVisible()
-  await expect(page.getByText('No external order or invoice data yet for this conversation.')).toBeVisible()
+  // Validate app shell is present
+  await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible({ timeout: 15000 })
+  await expect(page.getByText('Recent Searches')).toBeVisible()
+  // Plus button for new search
+  await expect(page.locator('button').filter({ has: page.locator('svg.lucide-plus') })).toBeVisible()
 })

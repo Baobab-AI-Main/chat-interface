@@ -110,13 +110,13 @@ test.describe('Admin User Flow', () => {
     const saveButton = page.getByRole('button', { name: /Save Changes/i })
     await saveButton.click()
     
-    // Verify success
-    await expect(page.getByText(/updated successfully/i)).toBeVisible({ timeout: 10000 })
+    // Verify success (use .first() to handle multiple toast elements)
+    await expect(page.getByText(/updated successfully/i).first()).toBeVisible({ timeout: 10000 })
     
     // Cleanup: revert change
     await nameInput.fill(originalName)
     await saveButton.click()
-    await expect(page.getByText(/updated successfully/i)).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText(/updated successfully/i).first()).toBeVisible({ timeout: 10000 })
   })
 })
 
@@ -198,28 +198,31 @@ test.describe('Regular User Flow', () => {
 })
 
 test.describe('Permission Boundaries', () => {
-  test('role-based access control works correctly', async ({ page }) => {
+  test('admin has workspace access, user does not', async ({ page }) => {
     const adminEmail = process.env.ADMIN_EMAIL
     const adminPassword = process.env.ADMIN_PASSWORD
-    const userEmail = process.env.USER_EMAIL
-    const userPassword = process.env.USER_PASSWORD
     
-    if (!adminEmail || !adminPassword || !userEmail || !userPassword) {
+    if (!adminEmail || !adminPassword) {
       test.skip()
       return
     }
 
-    // Test admin access
+    // Test admin has workspace access
     await login(page, adminEmail, adminPassword)
     await page.getByRole('button', { name: 'Settings' }).click()
     await expect(page.getByRole('tab', { name: /Workspace/i })).toBeVisible()
-    await page.keyboard.press('Escape')
+  })
+
+  test('regular user has no admin features', async ({ page }) => {
+    const userEmail = process.env.USER_EMAIL
+    const userPassword = process.env.USER_PASSWORD
     
-    // Logout
-    await page.getByRole('button', { name: 'Logout' }).click()
-    await page.waitForLoadState('networkidle')
-    
-    // Test user access
+    if (!userEmail || !userPassword) {
+      test.skip()
+      return
+    }
+
+    // Test user cannot see workspace tab
     await login(page, userEmail, userPassword)
     await page.getByRole('button', { name: 'Settings' }).click()
     await expect(page.getByRole('tab', { name: /Workspace/i })).toHaveCount(0)
