@@ -56,6 +56,22 @@ interface ChatMessage {
   payload?: N8nResponsePayload;
 }
 
+interface AutomationStreamMetadata {
+  nodeId?: string;
+  nodeName?: string;
+  itemIndex?: number;
+  runIndex?: number;
+  timestamp?: number;
+}
+
+type AutomationStreamEventType = "begin" | "item" | "end" | "error";
+
+interface AutomationStreamEvent {
+  type: AutomationStreamEventType;
+  content?: string;
+  metadata?: AutomationStreamMetadata;
+}
+
 type ConversationRow = {
   id: string;
   title: string | null;
@@ -134,6 +150,48 @@ function normalizeAutomationPayload(raw: unknown): unknown {
   }
 
   return raw;
+}
+
+function buildAutomationPayload(raw: unknown): N8nResponsePayload | null {
+  const normalized = normalizeAutomationPayload(raw);
+
+  if (isValidAutomationResponse(normalized)) {
+    return {
+      chat_response: normalized.chat_response,
+      order_from_sparklayer: normalized.order_from_sparklayer ?? null,
+      invoice_from_xero: normalized.invoice_from_xero ?? null,
+    };
+  }
+
+  if (typeof normalized === "string" && normalized.trim() !== "") {
+    return {
+      chat_response: normalized,
+      order_from_sparklayer: null,
+      invoice_from_xero: null,
+    };
+  }
+
+  return null;
+}
+
+function safeJsonParse(input: string): unknown {
+  try {
+    return JSON.parse(input);
+  } catch (error) {
+    console.warn("Failed to parse automation stream content", error);
+    return input;
+  }
+}
+
+function createTemporaryId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    try {
+      return `temp-${crypto.randomUUID()}`;
+    } catch (_) {
+      // falls back to timestamp-based id
+    }
+  }
+  return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function AppContent() {
@@ -380,6 +438,7 @@ function AppContent() {
       setSending(true);
 
       let userMessage: ChatMessage | null = null;
+      let provisionalId: string | null = null;
 
       try {
         const { data: userRow, error: userError } = await supabase
@@ -447,21 +506,174 @@ function AppContent() {
           throw new Error(text || `Automation returned ${response.status}`);
         }
 
-        const rawPayload = await response.json();
-        const payloadObject = normalizeAutomationPayload(rawPayload);
+        if (!response.body) {
+          const rawPayload = await response.json();
+          const automationPayload = buildAutomationPayload(rawPayload);
 
-        if (!isValidAutomationResponse(payloadObject)) {
-          console.error("Unexpected automation payload", rawPayload);
-          throw new Error("Automation response missing chat_response");
+          if (!automationPayload) {
+            console.error("Unexpected automation payload", rawPayload);
+            throw new Error("Automation response missing chat_response");
+          }
+
+          const { data: assistantRow, error: assistantError } = await supabase
+            .from("chat_messages")
+            .insert({
+              conversation_id: conversationId,
+              sender_user_id: null,
+              role: "assistant",
+              content: automationPayload.chat_response,
+              payload: automationPayload,
+            })
+            .select("id, conversation_id, role, content, payload, created_at")
+            .single();
+
+          if (assistantError) throw assistantError;
+
+          const assistantMessage = mapMessageRow(assistantRow as MessageRow);
+
+          setMessagesByConversation((prev) => ({
+            ...prev,
+            [conversationId]: sortMessagesByCreatedAt([...(prev[conversationId] ?? []), assistantMessage]),
+          }));
+
+          setConversations((prev) =>
+            prev.map((conversation) =>
+              conversation.id === conversationId
+                ? {
+                    ...conversation,
+                    title: nextTitle,
+                    updatedAt: assistantMessage.createdAt,
+                  }
+                : conversation
+            )
+          );
+
+          try {
+            await persistConversationUpdates(conversationId, {
+              updatedAt: assistantMessage.createdAt,
+              ...(shouldUpdateTitle ? { title: nextTitle } : {}),
+            });
+          } catch (metadataError) {
+            console.error("Failed to persist conversation metadata after automation message", metadataError);
+          }
+
+          await refreshConversations({ selectId: conversationId });
+          return;
         }
 
-        const normalizedPayload = payloadObject as N8nResponsePayload;
+        provisionalId = createTemporaryId();
 
-        const automationPayload: N8nResponsePayload = {
-          chat_response: normalizedPayload.chat_response,
-          order_from_sparklayer: normalizedPayload.order_from_sparklayer ?? null,
-          invoice_from_xero: normalizedPayload.invoice_from_xero ?? null,
+        const provisionalMessage: ChatMessage = {
+          id: provisionalId,
+          conversationId,
+          role: "assistant",
+          content: "",
+          createdAt: new Date().toISOString(),
         };
+
+        setMessagesByConversation((prev) => {
+          const existing = prev[conversationId] ?? [];
+          return {
+            ...prev,
+            [conversationId]: sortMessagesByCreatedAt([...existing, provisionalMessage]),
+          };
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let streamedContent = "";
+        let finalPayload: N8nResponsePayload | null = null;
+        let streamError: string | null = null;
+
+        const updateProvisionalContent = (content: string) => {
+          setMessagesByConversation((prev) => {
+            const existing = prev[conversationId] ?? [];
+            return {
+              ...prev,
+              [conversationId]: existing.map((message) =>
+                message.id === provisionalId ? { ...message, content } : message
+              ),
+            };
+          });
+        };
+
+        const processLine = (line: string) => {
+          const trimmedLine = line.trim();
+          if (!trimmedLine) return;
+
+          let event: AutomationStreamEvent;
+          try {
+            event = JSON.parse(trimmedLine) as AutomationStreamEvent;
+          } catch (parseError) {
+            console.error("Failed to parse automation stream chunk", parseError, line);
+            return;
+          }
+
+          if (event.type === "error") {
+            streamError = event.content ?? "The automation reported an error.";
+            return;
+          }
+
+          if (event.type !== "item" || typeof event.content !== "string") {
+            return;
+          }
+
+          const nodeName = event.metadata?.nodeName ?? "";
+
+          if (/respond to webhook/i.test(nodeName)) {
+            const parsedContent = safeJsonParse(event.content);
+            const automationPayload = buildAutomationPayload(parsedContent);
+
+            if (automationPayload) {
+              finalPayload = automationPayload;
+              streamedContent = automationPayload.chat_response;
+              updateProvisionalContent(streamedContent);
+            } else {
+              console.warn("Unexpected respond-to-webhook payload", parsedContent);
+            }
+
+            return;
+          }
+
+          streamedContent += event.content;
+          updateProvisionalContent(streamedContent);
+        };
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          let newlineIndex = buffer.indexOf("\n");
+          while (newlineIndex !== -1) {
+            const chunk = buffer.slice(0, newlineIndex);
+            processLine(chunk);
+            buffer = buffer.slice(newlineIndex + 1);
+            newlineIndex = buffer.indexOf("\n");
+          }
+        }
+
+        buffer += decoder.decode();
+        if (buffer.trim()) {
+          processLine(buffer);
+        }
+
+        if (streamError) {
+          throw new Error(streamError);
+        }
+
+        if (!finalPayload && streamedContent) {
+          finalPayload = {
+            chat_response: streamedContent,
+            order_from_sparklayer: null,
+            invoice_from_xero: null,
+          };
+        }
+
+        if (!finalPayload) {
+          throw new Error("Automation stream ended without a message.");
+        }
 
         const { data: assistantRow, error: assistantError } = await supabase
           .from("chat_messages")
@@ -469,8 +681,8 @@ function AppContent() {
             conversation_id: conversationId,
             sender_user_id: null,
             role: "assistant",
-            content: automationPayload.chat_response,
-            payload: automationPayload,
+            content: finalPayload.chat_response,
+            payload: finalPayload,
           })
           .select("id, conversation_id, role, content, payload, created_at")
           .single();
@@ -479,10 +691,16 @@ function AppContent() {
 
         const assistantMessage = mapMessageRow(assistantRow as MessageRow);
 
-        setMessagesByConversation((prev) => ({
-          ...prev,
-          [conversationId]: sortMessagesByCreatedAt([...(prev[conversationId] ?? []), assistantMessage]),
-        }));
+        setMessagesByConversation((prev) => {
+          const existing = prev[conversationId] ?? [];
+          const filtered = provisionalId
+            ? existing.filter((message) => message.id !== provisionalId)
+            : existing;
+          return {
+            ...prev,
+            [conversationId]: sortMessagesByCreatedAt([...filtered, assistantMessage]),
+          };
+        });
 
         setConversations((prev) =>
           prev.map((conversation) =>
@@ -507,6 +725,16 @@ function AppContent() {
 
         await refreshConversations({ selectId: conversationId });
       } catch (error) {
+        if (provisionalId) {
+          setMessagesByConversation((prev) => {
+            const existing = prev[conversationId] ?? [];
+            return {
+              ...prev,
+              [conversationId]: existing.filter((message) => message.id !== provisionalId),
+            };
+          });
+        }
+
         console.error("Automation request failed", error);
         const fallbackContent =
           error instanceof Error
