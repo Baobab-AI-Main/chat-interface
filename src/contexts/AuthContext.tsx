@@ -76,13 +76,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setUser(p);
     } else {
-      // Create a row bound to this auth user if missing (email from session)
+      // No user row found with this user_id
+      // Check if a row exists with the email but no user_id (legacy data)
       const s = (await supabase.auth.getSession()).data.session
       const email = s?.user?.email || ''
-      const ins = await supabase.from('users').insert({ user_id: uid, email, role: 'user' }).select('id, email, role, "Full Name", "Profile_Photo", user_id').single()
-      if (ins.error) throw ins.error
-      const d: any = ins.data
-      setUser({ id: d.id, email: d.email, role: d.role, name: d["Full Name"] || null, avatar: d["Profile_Photo"] || null, user_id: d.user_id || null })
+      
+      // Try to find existing row by email with null user_id
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id, email, role, "Full Name", "Profile_Photo", user_id')
+        .eq('email', email)
+        .is('user_id', null)
+        .maybeSingle()
+      
+      if (existingUser) {
+        // Update existing row with user_id
+        const { error: updateError, data: updated } = await supabase
+          .from('users')
+          .update({ user_id: uid })
+          .eq('id', (existingUser as any).id)
+          .select('id, email, role, "Full Name", "Profile_Photo", user_id')
+          .single()
+        if (updateError) throw updateError
+        const d: any = updated
+        setUser({ id: d.id, email: d.email, role: d.role, name: d["Full Name"] || null, avatar: d["Profile_Photo"] || null, user_id: d.user_id || null })
+      } else {
+        // Create new user row
+        const { error: insError, data: inserted } = await supabase
+          .from('users')
+          .insert({ user_id: uid, email, role: 'user' })
+          .select('id, email, role, "Full Name", "Profile_Photo", user_id')
+          .single()
+        if (insError) throw insError
+        const d: any = inserted
+        setUser({ id: d.id, email: d.email, role: d.role, name: d["Full Name"] || null, avatar: d["Profile_Photo"] || null, user_id: d.user_id || null })
+      }
     }
   };
 
