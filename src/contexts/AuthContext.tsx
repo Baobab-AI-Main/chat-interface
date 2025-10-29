@@ -41,7 +41,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const DEFAULT_WORKSPACE: Workspace = {
   name: 'BrunelAI',
-  logo: 'figma:asset/2a8790cd130a03ff81ea4aec63fd5860503e90bf.png'
+  logo: 'https://cdn.prod.website-files.com/66c612fe20ef1eb37815e9c0/66cdbbba740ac1a54de73d32_6564e7f063d057369324b970_Niya%20Logo%20(2).png'
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {

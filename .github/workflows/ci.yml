@@ -8,6 +8,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      BASE_URL: ${{ secrets.BASE_URL }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      USER_EMAIL: ${{ secrets.USER_EMAIL }}
+      USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,13 +33,9 @@ jobs:
         run: npx playwright install --with-deps
 
       - name: Health check (deployed)
-        env:
-          BASE_URL: ${{ secrets.BASE_URL }}
         run: node scripts/playwright-check.js
 
       - name: Run Playwright tests (deployed)
-        env:
-          BASE_URL: ${{ secrets.BASE_URL }}
         run: npx playwright test
 
       - name: Upload Playwright report on failure
