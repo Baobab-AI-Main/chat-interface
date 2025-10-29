@@ -8,6 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    environment: "chat-interface (empowering-communication / production)"
     env:
       BASE_URL: ${{ secrets.BASE_URL }}
       ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
