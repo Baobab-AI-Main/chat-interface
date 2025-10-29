@@ -115,6 +115,27 @@ function sortMessagesByCreatedAt(messages: ChatMessage[]): ChatMessage[] {
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 }
 
+function normalizeAutomationPayload(raw: unknown): unknown {
+  if (Array.isArray(raw)) {
+    return raw.length > 0 ? normalizeAutomationPayload(raw[0]) : raw;
+  }
+
+  if (raw && typeof raw === "object") {
+    const record = raw as Record<string, unknown>;
+    if (record.output !== undefined) {
+      const { output } = record;
+      if (Array.isArray(output)) {
+        return normalizeAutomationPayload(output);
+      }
+      if (output && typeof output === "object") {
+        return normalizeAutomationPayload(output);
+      }
+    }
+  }
+
+  return raw;
+}
+
 function AppContent() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -426,19 +447,20 @@ function AppContent() {
           throw new Error(text || `Automation returned ${response.status}`);
         }
 
-        const data = await response.json();
-        const payloadArray = Array.isArray(data) ? data : Array.isArray(data?.output) ? data.output : null;
-        const payloadObject = payloadArray && payloadArray.length > 0 ? payloadArray[0] : data;
+        const rawPayload = await response.json();
+        const payloadObject = normalizeAutomationPayload(rawPayload);
 
         if (!isValidAutomationResponse(payloadObject)) {
-          console.error("Unexpected automation payload", data);
+          console.error("Unexpected automation payload", rawPayload);
           throw new Error("Automation response missing chat_response");
         }
 
+        const normalizedPayload = payloadObject as N8nResponsePayload;
+
         const automationPayload: N8nResponsePayload = {
-          chat_response: payloadObject.chat_response,
-          order_from_sparklayer: payloadObject.order_from_sparklayer ?? null,
-          invoice_from_xero: payloadObject.invoice_from_xero ?? null,
+          chat_response: normalizedPayload.chat_response,
+          order_from_sparklayer: normalizedPayload.order_from_sparklayer ?? null,
+          invoice_from_xero: normalizedPayload.invoice_from_xero ?? null,
         };
 
         const { data: assistantRow, error: assistantError } = await supabase
