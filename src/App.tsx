@@ -134,6 +134,18 @@ function AppContent() {
     return messagesByConversation[activeConversationId] ?? [];
   }, [messagesByConversation, activeConversationId]);
 
+  const searchHistory = useMemo(() => {
+    return conversations
+      .slice()
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .map((conversation) => ({
+        id: conversation.id,
+        title: conversation.title || "Untitled conversation",
+        date: new Intl.DateTimeFormat("en-GB").format(new Date(conversation.updatedAt)),
+        isActive: conversation.id === activeConversationId,
+      }));
+  }, [conversations, activeConversationId]);
+
   const persistConversationUpdates = useCallback(
     async (conversationId: string, updates: { title?: string; updatedAt?: string }) => {
       const payload: Record<string, unknown> = {};
