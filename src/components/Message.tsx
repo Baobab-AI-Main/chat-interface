@@ -1,6 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Spinner } from "./ui/spinner";
 
 interface MessageProps {
   content: string;
@@ -11,6 +12,7 @@ interface MessageProps {
 
 export function Message({ content, role, createdAt, senderAvatar }: MessageProps) {
   const isUser = role === "user";
+  const isLoadingAssistant = role === "assistant" && content.trim() === "";
 
   const formattedTime = new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
@@ -32,15 +34,21 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
             isUser ? "bg-blue-600 text-white" : "bg-muted text-foreground"
           }`}
         >
-          <ReactMarkdown
-            className={`space-y-2 break-words whitespace-pre-wrap [&_*]:leading-relaxed ${
-              isUser ? "[&_a]:text-white" : ""
-            }`}
-            linkTarget="_blank"
-            remarkPlugins={[remarkBreaks]}
-          >
-            {content}
-          </ReactMarkdown>
+          {isLoadingAssistant ? (
+            <div className="flex items-center justify-center">
+              <Spinner size="sm" />
+            </div>
+          ) : (
+            <ReactMarkdown
+              className={`space-y-2 break-words whitespace-pre-wrap [&_*]:leading-relaxed ${
+                isUser ? "[&_a]:text-white" : ""
+              }`}
+              linkTarget="_blank"
+              remarkPlugins={[remarkBreaks]}
+            >
+              {content}
+            </ReactMarkdown>
+          )}
         </div>
 
         <span className="mt-2 px-2 text-xs text-muted-foreground">{formattedTime}</span>
