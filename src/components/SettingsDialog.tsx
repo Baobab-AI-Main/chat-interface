@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from './ui/badge';
 import { useAuth } from '../contexts/AuthContext';
 import { User, Upload, Trash2 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { useUsers } from '../hooks/useUsers';
 
 interface SettingsDialogProps {
@@ -41,8 +41,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [profileName, setProfileName] = useState(user?.name || '');
   const [profileEmail, setProfileEmail] = useState(user?.email || '');
   const [workspaceName, setWorkspaceName] = useState(workspace.name);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const { users, loading, error, createUser, deleteUser, updateUser } = useUsers()
+
+  // Sync workspaceName when workspace.name changes
+  useEffect(() => {
+    setWorkspaceName(workspace.name);
+  }, [workspace.name]);
 
   const handleProfileSave = async () => {
     try {
@@ -64,21 +71,36 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   }
 
   const handleWorkspaceSave = async () => {
+    if (workspaceLoading) return;
     try {
+      setWorkspaceLoading(true);
       await updateWorkspace({ name: workspaceName });
-      toast('Workspace settings updated successfully');
+      toast.success('Workspace settings updated successfully');
     } catch (e: any) {
-      toast(`Failed to update workspace: ${e.message || e}`)
+      toast.error(`Failed to update workspace: ${e.message || e}`);
+    } finally {
+      setWorkspaceLoading(false);
     }
   };
 
   const handleWorkspaceLogoUpload = async (file?: File) => {
     if (!file) return;
+    if (logoUploading) return;
+    
+    // Enforce PNG-only validation
+    if (!file.type.includes('png')) {
+      toast.error('Only PNG files are supported');
+      return;
+    }
+    
     try {
-      await uploadWorkspaceLogo(file)
-      toast('Workspace logo updated')
+      setLogoUploading(true);
+      await uploadWorkspaceLogo(file);
+      toast.success('Workspace logo updated');
     } catch (e: any) {
-      toast(`Failed to upload logo: ${e.message || e}`)
+      toast.error(`Failed to upload logo: ${e.message || e}`);
+    } finally {
+      setLogoUploading(false);
     }
   };
 
@@ -232,12 +254,18 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       <img src={workspace.logo} alt="Workspace logo" className="h-12 object-contain" />
                     </div>
                     <div className="flex-1">
-                      <label className="inline-flex items-center gap-2 text-sm">
-                        <input type="file" accept="image/png" onChange={(e)=>handleWorkspaceLogoUpload(e.target.files?.[0]||undefined)} />
-                        <Upload className="w-4 h-4" /> PNG only
+                      <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+                        <input 
+                          type="file" 
+                          accept="image/png" 
+                          onChange={(e)=>handleWorkspaceLogoUpload(e.target.files?.[0]||undefined)}
+                          disabled={logoUploading}
+                          className="cursor-pointer"
+                        />
+                        <Upload className="w-4 h-4" /> {logoUploading ? 'Uploading...' : 'PNG only'}
                       </label>
                       <p className="text-xs text-muted-foreground mt-2">
-                        Recommended size: 200x200px. PNG format.
+                        Recommended size: 200x200px. PNG format only.
                       </p>
                     </div>
                   </div>
@@ -258,8 +286,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </div>
 
               <div className="flex justify-end pt-4 border-t">
-                <Button onClick={handleWorkspaceSave} className="bg-black hover:bg-gray-800">
-                  Save Changes
+                <Button 
+                  onClick={handleWorkspaceSave} 
+                  className="bg-black hover:bg-gray-800"
+                  disabled={workspaceLoading || logoUploading}
+                >
+                  {workspaceLoading ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
             </TabsContent>

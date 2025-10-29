@@ -5,7 +5,7 @@ import { Label } from './ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
+import { fetchOrgOnce } from '../hooks/useOrg';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -16,18 +16,14 @@ export function LoginPage() {
   const [orgLogo, setOrgLogo] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string>('BrunelAI');
 
-  // Load org branding (public read)
+  // Load org branding on each login page visit
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase
-          .from('org')
-          .select('org_name, org_logo')
-          .limit(1)
-          .maybeSingle();
+        const data = await fetchOrgOnce();
         if (data) {
-          setOrgLogo((data as any).org_logo || null);
-          setOrgName((data as any).org_name || '');
+          setOrgLogo(data.org_logo);
+          setOrgName(data.org_name || 'BrunelAI');
         }
       } catch {}
     })();

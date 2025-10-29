@@ -6,6 +6,20 @@ export interface Org {
   org_logo: string | null
 }
 
+/**
+ * Shared helper to fetch the top org record.
+ * Use this for per-visit fetches (e.g., login screen).
+ */
+export async function fetchOrgOnce() {
+  const { data, error } = await supabase
+    .from('org')
+    .select('org_name, org_logo')
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data as Org | null
+}
+
 export function useOrg() {
   const [org, setOrg] = useState<Org | null>(null)
   const [loading, setLoading] = useState(true)
@@ -14,13 +28,8 @@ export function useOrg() {
   useEffect(() => {
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('org')
-          .select('org_name, org_logo')
-          .limit(1)
-          .maybeSingle()
-        if (error) throw error
-        if (data) setOrg(data as Org)
+        const data = await fetchOrgOnce()
+        if (data) setOrg(data)
       } catch (e: any) {
         setError(e.message)
       } finally {

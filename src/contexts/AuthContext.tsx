@@ -32,7 +32,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
   uploadProfileAvatar: (file: File) => Promise<void>;
-  updateWorkspace: (updates: Partial<Workspace>) => void;
+  updateWorkspace: (updates: Partial<Workspace>) => Promise<Workspace>;
   uploadWorkspaceLogo: (file: File) => Promise<void>;
   isAdmin: boolean;
 }
@@ -178,8 +178,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
     if (error) throw error
     if (data) {
-      setWorkspace({ name: (data as any).org_name || workspace.name, logo: (data as any).org_logo || workspace.logo })
+      const updated = { name: (data as any).org_name || workspace.name, logo: (data as any).org_logo || workspace.logo }
+      setWorkspace(updated)
+      return updated
     }
+    return workspace
   };
 
   const uploadWorkspaceLogo = async (file: File) => {
