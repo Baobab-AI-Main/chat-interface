@@ -1,4 +1,5 @@
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 interface MessageProps {
@@ -36,6 +37,7 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
               isUser ? "[&_a]:text-white" : ""
             }`}
             linkTarget="_blank"
+            remarkPlugins={[remarkBreaks]}
           >
             {content}
           </ReactMarkdown>
