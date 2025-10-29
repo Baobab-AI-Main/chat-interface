@@ -1,7 +1,14 @@
 import ReactMarkdown from "react-markdown";
+import type { Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
+import type { Options as RehypeSanitizeOptions } from "rehype-sanitize";
+import rehypeHighlight from "rehype-highlight";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Spinner } from "./ui/spinner";
+import { cn } from "./ui/utils";
+import "highlight.js/styles/github-dark.css";
 
 interface MessageProps {
   content: string;
@@ -9,6 +16,31 @@ interface MessageProps {
   createdAt: string;
   senderAvatar?: string;
 }
+
+const markdownSchema: RehypeSanitizeOptions = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    code: [...(((defaultSchema.attributes?.code as Array<any>) ?? [])), ["className"]],
+    pre: [...(((defaultSchema.attributes?.pre as Array<any>) ?? [])), ["className"]],
+    span: [...(((defaultSchema.attributes?.span as Array<any>) ?? [])), ["className"]],
+    a: [
+      ...(((defaultSchema.attributes?.a as Array<any>) ?? [])),
+      ["className"],
+      ["target"],
+      ["rel"],
+    ],
+  },
+  tagNames: [
+    ...((defaultSchema.tagNames as string[]) ?? []),
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+  ],
+};
 
 export function Message({ content, role, createdAt, senderAvatar }: MessageProps) {
   const isUser = role === "user";
@@ -18,6 +50,44 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(createdAt));
+
+  const markdownComponents: Components = {
+    a: ({ className, ...props }) => (
+      <a
+        {...props}
+        className={cn(
+          "underline underline-offset-2 hover:opacity-80",
+          isUser ? "text-white" : "text-cyan-600",
+          className
+        )}
+        target="_blank"
+        rel="noopener noreferrer"
+      />
+    ),
+    code: ({ inline, className, children, ...props }) => {
+      if (inline) {
+        return (
+          <code
+            {...props}
+            className={cn("rounded bg-muted px-1 py-0.5 text-sm font-mono", className)}
+          >
+            {children}
+          </code>
+        );
+      }
+
+      return (
+        <pre className="bg-muted/70 p-3 rounded-lg overflow-x-auto text-sm">
+          <code
+            {...props}
+            className={cn("font-mono", className)}
+          >
+            {children}
+          </code>
+        </pre>
+      );
+    },
+  };
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"} mb-6`}>
@@ -40,11 +110,13 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
             </div>
           ) : (
             <ReactMarkdown
-              className={`space-y-2 break-words whitespace-pre-wrap [&_*]:leading-relaxed ${
-                isUser ? "[&_a]:text-white" : ""
-              }`}
-              linkTarget="_blank"
-              remarkPlugins={[remarkBreaks]}
+              className={cn(
+                "prose max-w-none break-words whitespace-pre-wrap [&_*]:leading-relaxed",
+                isUser ? "prose-invert" : ""
+              )}
+              remarkPlugins={[remarkGfm, remarkBreaks]}
+              rehypePlugins={[[rehypeSanitize, markdownSchema], rehypeHighlight]}
+              components={markdownComponents}
             >
               {content}
             </ReactMarkdown>
