@@ -10,19 +10,20 @@ export interface AppUser {
   profilePhoto: string | null
 }
 
-export function useUsers() {
+export function useUsers(enabled: boolean = true) {
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchUsers = useCallback(async () => {
+    if (!enabled) {
+      return
+    }
     setLoading(true)
     setError(null)
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, user_id, email, role, "Full Name", "Profile_Photo"')
-        .order('created_at', { ascending: false })
+      // Use admin RPC function to bypass RLS
+      const { data, error } = await supabase.rpc('admin_get_all_users')
       if (error) throw error
       const mapped: AppUser[] = (data || []).map((d: any) => ({
         id: d.id,
@@ -38,16 +39,28 @@ export function useUsers() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [enabled])
 
-  useEffect(() => { fetchUsers() }, [fetchUsers])
+  useEffect(() => {
+    if (!enabled) {
+      setUsers([])
+      setLoading(false)
+      setError(null)
+      return
+    }
+    fetchUsers()
+  }, [enabled, fetchUsers])
 
   const createUser = async (email: string, fullName: string, role: 'admin'|'user') => {
-    const { error, data } = await supabase
-      .from('users')
-      .insert({ email, role, "Full Name": fullName })
-      .select('id, user_id, email, role, "Full Name", "Profile_Photo"')
-      .single()
+    if (!enabled) {
+      throw new Error('User management is restricted')
+    }
+    // Use admin RPC function
+    const { error, data } = await supabase.rpc('admin_create_user', {
+      p_email: email,
+      p_role: role,
+      p_full_name: fullName
+    })
     if (error) throw error
     const d: any = data
     setUsers(prev => [{
@@ -61,21 +74,25 @@ export function useUsers() {
   }
 
   const deleteUser = async (id: string) => {
-    const { error } = await supabase.from('users').delete().eq('id', id)
+    if (!enabled) {
+      throw new Error('User management is restricted')
+    }
+    // Use admin RPC function
+    const { error } = await supabase.rpc('admin_delete_user', { p_user_id: id })
     if (error) throw error
     setUsers(prev => prev.filter(u => u.id !== id))
   }
 
   const updateUser = async (id: string, fields: Partial<{ fullName: string; role: 'admin'|'user' }>) => {
-    const payload: any = {}
-    if (fields.fullName !== undefined) payload['Full Name'] = fields.fullName
-    if (fields.role !== undefined) payload['role'] = fields.role
-    const { error, data } = await supabase
-      .from('users')
-      .update(payload)
-      .eq('id', id)
-      .select('id, user_id, email, role, "Full Name", "Profile_Photo"')
-      .single()
+    if (!enabled) {
+      throw new Error('User management is restricted')
+    }
+    // Use admin RPC function
+    const { error, data } = await supabase.rpc('admin_update_user', {
+      p_user_id: id,
+      p_full_name: fields.fullName ?? null,
+      p_role: fields.role ?? null
+    })
     if (error) throw error
     const d: any = data
     setUsers(prev => prev.map(u => u.id===id ? ({

@@ -305,9 +305,9 @@ test.describe('Non-Admin User Restrictions', () => {
     // Open settings
     await page.getByRole('button', { name: 'Settings' }).click()
     
-    // Workspace tab should be disabled
-    const workspaceTab = page.getByRole('tab', { name: /Workspace/i })
-    await expect(workspaceTab).toBeDisabled()
+    // Workspace and Team Management tabs should be hidden
+    await expect(page.getByRole('tab', { name: /Workspace/i })).toHaveCount(0)
+    await expect(page.getByRole('tab', { name: /Team Management/i })).toHaveCount(0)
   })
 })
 
