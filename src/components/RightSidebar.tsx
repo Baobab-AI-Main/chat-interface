@@ -72,12 +72,17 @@ export function RightSidebar({ details }: RightSidebarProps) {
 
               {entry.order && (
                 <Card>
-                  <CardHeader className="pb-2">
+                  <CardHeader className="px-4 pt-4 pb-1">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <Package className="w-4 h-4" /> Sparklayer Order
+                      <img
+                        src="https://www.sparklayer.io/assets/images/icons/emblem.png"
+                        alt="SparkLayer logo"
+                        className="w-5 h-5 object-contain"
+                      />
+                      Sparklayer Order
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
+                  <CardContent className="px-4 pt-0 pb-4 space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <FileText className="w-4 h-4" />
                       <span className="font-medium text-foreground">{entry.order.orderId}</span>
@@ -106,19 +111,24 @@ export function RightSidebar({ details }: RightSidebarProps) {
 
               {entry.invoice && (
                 <Card>
-                  <CardHeader className="pb-2">
+                  <CardHeader className="px-4 pt-4 pb-1">
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <FileText className="w-4 h-4" /> Xero Invoice
+                      <img
+                        src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9f/Xero_software_logo.svg/1200px-Xero_software_logo.svg.png"
+                        alt="Xero logo"
+                        className="w-5 h-5 object-contain"
+                      />
+                      Xero Invoice
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
+                  <CardContent className="px-4 pt-0 pb-4 space-y-2 text-sm">
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <FileText className="w-4 h-4" />
                       <span className="font-medium text-foreground">{entry.invoice.invoiceId}</span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <DollarSign className="w-4 h-4" />
-                      <span>{formatAmount(entry.invoice.amountDue)}</span>
+                      <span>£{formatAmount(entry.invoice.amountDue)}</span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Badge variant="outline" className="text-xs uppercase">
