@@ -16,10 +16,9 @@ interface SidebarProps {
   searchHistory: SearchHistoryItem[];
   onSelectSearch: (searchId: string) => void;
   onSettingsClick: () => void;
-  onTeamManagementClick?: () => void;
 }
 
-export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettingsClick, onTeamManagementClick }: SidebarProps) {
+export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettingsClick }: SidebarProps) {
   const { user, workspace, logout } = useAuth();
 
   return (

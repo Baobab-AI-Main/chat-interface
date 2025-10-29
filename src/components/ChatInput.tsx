@@ -4,7 +4,7 @@ import { Input } from "./ui/input";
 import { Send } from "lucide-react";
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => void | Promise<void>;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -15,8 +15,11 @@ export function ChatInput({ onSendMessage, disabled = false, placeholder = "Desc
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
-      onSendMessage(message.trim());
+      const payload = message.trim();
       setMessage("");
+      Promise.resolve(onSendMessage(payload)).catch((err) => {
+        console.error("Failed to send message", err);
+      });
     }
   };
 

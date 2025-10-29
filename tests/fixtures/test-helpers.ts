@@ -83,7 +83,7 @@ export async function loginAsUser(page: Page) {
 /**
  * Open settings dialog and navigate to specific tab
  */
-export async function openSettingsTab(page: Page, tabName: 'Profile' | 'Team' | 'Workspace') {
+export async function openSettingsTab(page: Page, tabName: 'Profile' | 'Workspace') {
   await page.getByRole('button', { name: 'Settings' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   

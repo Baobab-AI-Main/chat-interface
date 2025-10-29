@@ -18,5 +18,6 @@ test('sign in with admin if creds provided', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign In' }).click()
   // Validate app shell and admin-only control present
   await expect(page.getByRole('button', { name: 'New Search' })).toBeVisible({ timeout: 15000 })
-  await expect(page.getByRole('button', { name: 'Teams' })).toBeVisible()
+  await expect(page.getByText('Conversation Details')).toBeVisible()
+  await expect(page.getByText('No external order or invoice data yet for this conversation.')).toBeVisible()
 })
