@@ -428,6 +428,7 @@ function AppContent() {
 
         const data = await response.json();
         if (!isValidAutomationResponse(data)) {
+          console.error("Unexpected automation payload", data);
           throw new Error("Automation response missing chat_response");
         }
 
