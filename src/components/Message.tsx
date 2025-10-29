@@ -1,3 +1,4 @@
+import ReactMarkdown from "react-markdown";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 interface MessageProps {
@@ -30,7 +31,14 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
             isUser ? "bg-blue-600 text-white" : "bg-muted text-foreground"
           }`}
         >
-          <p className="break-words whitespace-pre-wrap">{content}</p>
+          <ReactMarkdown
+            className={`space-y-2 break-words whitespace-pre-wrap [&_*]:leading-relaxed ${
+              isUser ? "[&_a]:text-white" : ""
+            }`}
+            linkTarget="_blank"
+          >
+            {content}
+          </ReactMarkdown>
         </div>
 
         <span className="mt-2 px-2 text-xs text-muted-foreground">{formattedTime}</span>
