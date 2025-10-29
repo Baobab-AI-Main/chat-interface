@@ -51,7 +51,7 @@ export function LoginPage() {
               <img src={orgLogo} alt={orgName} className="h-12" />
             </div>
           )}
-          <CardTitle>Welcome to {orgName || 'BrunelAI'}</CardTitle>
+          <CardTitle>Welcome to {orgName || 'Niya AI'}</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent>
