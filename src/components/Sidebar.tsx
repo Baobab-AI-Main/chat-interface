@@ -1,5 +1,6 @@
 import { Button } from "./ui/button";
 import { Plus, Search, Clock, Settings, LogOut, X } from "lucide-react";
+import type { CSSProperties } from "react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { useAuth } from "../contexts/AuthContext";
@@ -33,10 +34,17 @@ export function Sidebar({
   const isDrawer = mode === "drawer";
   const containerClasses = isDrawer
     ? "w-full bg-card flex flex-col h-full"
-    : "min-w-0 max-w-[25%] basis-[25%] flex-shrink-0 bg-card border-r flex flex-col h-full";
+    : "min-w-0 bg-card border-r flex flex-col h-full";
+  const inlineWidthStyles: CSSProperties | undefined = isDrawer
+    ? undefined
+    : {
+        flexBasis: "25%",
+        maxWidth: "25%",
+        width: "25%",
+      };
 
   return (
-    <div className={containerClasses}>
+    <div className={containerClasses} style={inlineWidthStyles}>
       {/* Logo and Header */}
       <div className={`p-4 border-b ${isDrawer ? "pt-3" : ""}`}>
         <div className="flex items-center justify-between gap-3">
