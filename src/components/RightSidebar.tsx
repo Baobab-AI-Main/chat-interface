@@ -79,7 +79,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
                       <img
                         src="https://www.sparklayer.io/assets/images/icons/emblem.png"
                         alt="SparkLayer logo"
-                        className="w-[30px] h-[30px] object-contain"
+                        className="w-8 h-8 object-contain shrink-0"
                       />
                       Sparklayer Order
                     </CardTitle>
@@ -118,7 +118,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
                       <img
                         src="https://upload.wikimedia.org/wikipedia/en/thumb/9/9f/Xero_software_logo.svg/1200px-Xero_software_logo.svg.png"
                         alt="Xero logo"
-                        className="w-[30px] h-[30px] object-contain"
+                        className="w-8 h-8 object-contain shrink-0"
                       />
                       Xero Invoice
                     </CardTitle>
