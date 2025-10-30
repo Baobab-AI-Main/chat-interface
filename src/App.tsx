@@ -336,12 +336,6 @@ function AppContent() {
     }
   }, [isMobile]);
 
-  useEffect(() => {
-    if (!hasDetails) {
-      setIsDetailsOpen(false);
-    }
-  }, [hasDetails]);
-
   const sidebarDetails: ConversationDetailEntry[] = useMemo(() => {
     return activeMessages
       .filter((message) => {
@@ -374,6 +368,12 @@ function AppContent() {
   }, [activeMessages]);
 
   const hasDetails = sidebarDetails.length > 0;
+
+  useEffect(() => {
+    if (!hasDetails) {
+      setIsDetailsOpen(false);
+    }
+  }, [hasDetails]);
 
   const handleNewSearch = useCallback(async () => {
     if (!user?.id) {
