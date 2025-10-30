@@ -1,6 +1,6 @@
-const { chromium } = require('playwright');
+import { chromium } from 'playwright';
 
-(async () => {
+async function main() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   const url =
@@ -14,4 +14,9 @@ const { chromium } = require('playwright');
   console.log(JSON.stringify({ url, status, title }));
   await browser.close();
   if (!status || status >= 400) process.exit(1);
-})().catch(err => { console.error(err); process.exit(1); });
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -2,6 +2,7 @@
       "name": "Chat Interface",
       "version": "0.1.0",
       "private": true,
+      "type": "module",
       "dependencies": {
             "@radix-ui/react-accordion": "^1.2.3",
             "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -80,7 +81,7 @@
             "preview": "vite preview",
             "playwright:install": "playwright install",
             "health": "node scripts/playwright-check.js",
-            "test:e2e": "playwright test",
+            "test:e2e": "dotenv -e .env -- playwright test",
             "seed:org": "node scripts/seed-org.js"
       }
 }

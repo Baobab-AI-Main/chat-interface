@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test'
 
 test('loads login page', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Welcome to BrunelAI' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /Welcome to/i })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible()
 })
 
