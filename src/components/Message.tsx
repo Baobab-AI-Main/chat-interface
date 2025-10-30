@@ -25,6 +25,15 @@ const markdownSchema: RehypeSanitizeOptions = {
     code: [...(((defaultSchema.attributes?.code as Array<any>) ?? [])), ["className"]],
     pre: [...(((defaultSchema.attributes?.pre as Array<any>) ?? [])), ["className"]],
     span: [...(((defaultSchema.attributes?.span as Array<any>) ?? [])), ["className"]],
+    ul: [...(((defaultSchema.attributes?.ul as Array<any>) ?? [])), ["className"]],
+    ol: [...(((defaultSchema.attributes?.ol as Array<any>) ?? [])), ["className"]],
+    li: [...(((defaultSchema.attributes?.li as Array<any>) ?? [])), ["className"]],
+    table: [...(((defaultSchema.attributes?.table as Array<any>) ?? [])), ["className"]],
+    thead: [...(((defaultSchema.attributes?.thead as Array<any>) ?? [])), ["className"]],
+    tbody: [...(((defaultSchema.attributes?.tbody as Array<any>) ?? [])), ["className"]],
+    tr: [...(((defaultSchema.attributes?.tr as Array<any>) ?? [])), ["className"]],
+    th: [...(((defaultSchema.attributes?.th as Array<any>) ?? [])), ["className"], ["align"], ["scope"]],
+    td: [...(((defaultSchema.attributes?.td as Array<any>) ?? [])), ["className"], ["align"], ["colSpan"], ["rowSpan"]],
     a: [
       ...(((defaultSchema.attributes?.a as Array<any>) ?? [])),
       ["className"],
@@ -64,6 +73,72 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
         target="_blank"
         rel="noopener noreferrer"
       />
+    ),
+    p: ({ className, children, ...props }) => (
+      <p {...props} className={cn("my-3 leading-relaxed", className)}>
+        {children}
+      </p>
+    ),
+    ul: ({ className, children, ...props }) => (
+      <ul {...props} className={cn("my-3 list-disc space-y-2 pl-6", className)}>
+        {children}
+      </ul>
+    ),
+    ol: ({ className, children, ...props }) => (
+      <ol {...props} className={cn("my-3 list-decimal space-y-2 pl-6", className)}>
+        {children}
+      </ol>
+    ),
+    li: ({ className, children, ...props }) => (
+      <li {...props} className={cn("leading-relaxed", className)}>
+        {children}
+      </li>
+    ),
+    blockquote: ({ className, children, ...props }) => (
+      <blockquote
+        {...props}
+        className={cn("my-4 border-l-4 border-muted-foreground/40 pl-4 italic", className)}
+      >
+        {children}
+      </blockquote>
+    ),
+    table: ({ className, children, ...props }) => (
+      <div className="my-4 w-full overflow-x-auto">
+        <table {...props} className={cn("w-full border-collapse text-sm", className)}>
+          {children}
+        </table>
+      </div>
+    ),
+    thead: ({ className, children, ...props }) => (
+      <thead {...props} className={cn("bg-muted text-foreground", className)}>
+        {children}
+      </thead>
+    ),
+    tbody: ({ className, children, ...props }) => (
+      <tbody {...props} className={cn("divide-y divide-border", className)}>
+        {children}
+      </tbody>
+    ),
+    tr: ({ className, children, ...props }) => (
+      <tr {...props} className={cn("border-b border-border last:border-0", className)}>
+        {children}
+      </tr>
+    ),
+    th: ({ className, children, ...props }) => (
+      <th
+        {...props}
+        className={cn(
+          "px-3 py-2 text-left font-medium text-muted-foreground",
+          className
+        )}
+      >
+        {children}
+      </th>
+    ),
+    td: ({ className, children, ...props }) => (
+      <td {...props} className={cn("px-3 py-2 align-top", className)}>
+        {children}
+      </td>
     ),
   code: ({ inline, className, children, ...props }: any) => {
       if (inline) {
