@@ -68,6 +68,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
             <div key={entry.messageId} className="space-y-3">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {formatDate(entry.createdAt)}
+              </div>
               {entry.order && (
                 <Card>
                   <CardHeader className="px-4 pt-4 pb-1">
@@ -145,7 +146,6 @@ export function RightSidebar({ details }: RightSidebarProps) {
                     )}
                   </CardContent>
                 </Card>
-              )}
               )}
             </div>
           ))}
