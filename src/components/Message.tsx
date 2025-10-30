@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Spinner } from "./ui/spinner";
 import { cn } from "./ui/utils";
 import "highlight.js/styles/github-dark.css";
+import { appConfig } from "../config";
 
 interface MessageProps {
   content: string;
@@ -64,7 +65,7 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
         rel="noopener noreferrer"
       />
     ),
-    code: ({ inline, className, children, ...props }) => {
+  code: ({ inline, className, children, ...props }: any) => {
       if (inline) {
         return (
           <code
@@ -92,7 +93,7 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"} mb-6`}>
       <Avatar className="w-8 h-8">
-        <AvatarImage src={senderAvatar} alt={isUser ? "You" : "BrunelAI"} />
+        <AvatarImage src={senderAvatar} alt={isUser ? "You" : appConfig.brandFallbackName} />
         <AvatarFallback className={isUser ? "bg-blue-100 text-blue-700" : "bg-black text-white"}>
           {isUser ? "U" : "AI"}
         </AvatarFallback>
@@ -115,7 +116,7 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
                 isUser ? "prose-invert" : ""
               )}
               remarkPlugins={[remarkGfm, remarkBreaks]}
-              rehypePlugins={[[rehypeSanitize, markdownSchema], rehypeHighlight]}
+              rehypePlugins={[[rehypeSanitize, markdownSchema], rehypeHighlight] as any}
               components={markdownComponents}
             >
               {content}

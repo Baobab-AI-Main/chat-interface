@@ -11,6 +11,7 @@ import { ScrollArea } from "./components/ui/scroll-area";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 import { supabase } from "./lib/supabase";
+import { appConfig } from "./config";
 
 interface Conversation {
   id: string;
@@ -88,9 +89,6 @@ type MessageRow = {
   created_at: string;
 };
 
-const AUTOMATION_ENDPOINT =
-  "https://primary-production-b90af.up.railway.app/webhook/8406a7a5-61e5-43fc-a384-e61662223e53-niyaai" as const;
-
 function isValidAutomationResponse(data: unknown): data is N8nResponsePayload {
   if (typeof data !== "object" || data === null) return false;
   const payload = data as Record<string, unknown>;
@@ -118,7 +116,7 @@ function mapMessageRow(row: MessageRow): ChatMessage {
   if (row.payload && typeof row.payload === "object") {
     const candidate = row.payload as Record<string, unknown>;
     if (typeof candidate.chat_response === "string") {
-      message.payload = candidate as N8nResponsePayload;
+      message.payload = candidate as unknown as N8nResponsePayload;
     }
   }
 
@@ -489,8 +487,15 @@ function AppContent() {
         return;
       }
 
+      const automationEndpoint = appConfig.automationEndpoint;
+      if (!automationEndpoint) {
+        toast.error("Automation endpoint is not configured.");
+        setSending(false);
+        return;
+      }
+
       try {
-        const response = await fetch(AUTOMATION_ENDPOINT, {
+        const response = await fetch(automationEndpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -822,8 +827,6 @@ function AppContent() {
           <div className="w-full max-w-5xl flex flex-col h-full">
             <ChatHeader
               searchTitle={activeConversation?.title || "Untitled conversation"}
-              isConnected={true}
-              connectionSource="n8n"
             />
             <ScrollArea ref={scrollAreaRef} className="flex-1 h-0">
               <div className="p-6 space-y-1">

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Send } from "lucide-react";
+import { appConfig } from "../config";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void | Promise<void>;
@@ -9,7 +10,7 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-export function ChatInput({ onSendMessage, disabled = false, placeholder = "Describe the type of institutional investor you're looking for..." }: ChatInputProps) {
+export function ChatInput({ onSendMessage, disabled = false, placeholder = appConfig.chatInputPlaceholder }: ChatInputProps) {
   const [message, setMessage] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -2,6 +2,7 @@ import { Calendar, ExternalLink, FileText, Package, User, DollarSign } from "luc
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";
+import { appConfig } from "../config";
 
 export interface SparklayerOrderDetail {
   orderId: string;
@@ -46,6 +47,8 @@ function formatAmount(amount: number) {
 }
 
 export function RightSidebar({ details }: RightSidebarProps) {
+  const currencySymbol = appConfig.financeCurrencySymbol;
+
   if (details.length === 0) {
     return <aside className="w-0 overflow-hidden" aria-hidden="true" />;
   }
@@ -127,7 +130,10 @@ export function RightSidebar({ details }: RightSidebarProps) {
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <DollarSign className="w-4 h-4" />
-                      <span>£{formatAmount(entry.invoice.amountDue)}</span>
+                      <span>
+                        {currencySymbol}
+                        {formatAmount(entry.invoice.amountDue)}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Badge variant="outline" className="text-xs uppercase">

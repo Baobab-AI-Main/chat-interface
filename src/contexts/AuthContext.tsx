@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { appConfig } from '../config';
 
 export interface Profile {
   id: string;
@@ -40,8 +41,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const DEFAULT_WORKSPACE: Workspace = {
-  name: 'BrunelAI',
-  logo: 'https://cdn.prod.website-files.com/66c612fe20ef1eb37815e9c0/66cdbbba740ac1a54de73d32_6564e7f063d057369324b970_Niya%20Logo%20(2).png'
+  name: appConfig.brandFallbackName,
+  logo: appConfig.brandLogoUrl,
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {

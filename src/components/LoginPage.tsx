@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Alert, AlertDescription } from './ui/alert';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchOrgOnce } from '../hooks/useOrg';
+import { appConfig } from '../config';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -13,8 +14,8 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const auth = useAuth();
-  const [orgLogo, setOrgLogo] = useState<string | null>(null);
-  const [orgName, setOrgName] = useState<string>('BrunelAI');
+  const [orgLogo, setOrgLogo] = useState<string | null>(appConfig.brandLogoUrl || null);
+  const [orgName, setOrgName] = useState<string>(appConfig.brandFallbackName);
 
   // Load org branding on each login page visit
   useEffect(() => {
@@ -23,7 +24,7 @@ export function LoginPage() {
         const data = await fetchOrgOnce();
         if (data) {
           setOrgLogo(data.org_logo);
-          setOrgName(data.org_name || 'BrunelAI');
+          setOrgName(data.org_name || appConfig.brandFallbackName);
         }
       } catch {}
     })();
@@ -51,7 +52,7 @@ export function LoginPage() {
               <img src={orgLogo} alt={orgName} className="h-12" />
             </div>
           )}
-          <CardTitle>Welcome to {orgName || 'Niya AI'}</CardTitle>
+          <CardTitle>Welcome to {orgName || appConfig.brandFallbackName}</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent>
