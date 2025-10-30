@@ -22,19 +22,19 @@ export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettings
   const { user, workspace, logout } = useAuth();
 
   return (
-    <div className="w-64 bg-card border-r flex flex-col h-full">
-      {/* Logo and Header */}}
+    <div className="w-1/4 bg-card border-r flex flex-col h-full">
+      {/* Logo and Header */}
       <div className="p-4 border-b">
-        <div className="flex items-center justify-between">
-          <img src={workspace.logo} alt={workspace.name} className="h-8" />
-            <Button
-            onClick={onNewSearch}
-            className="rounded-[8px] bg-black text-white hover:bg-gray-800"
-            size="icon"
-            >
-            <Plus className="w-4 h-4" />
-            </Button>
-        </div>
+      <div className="flex items-center justify-between">
+        <img src={workspace.logo} alt={workspace.name} className="h-8" />
+        <Button
+        onClick={onNewSearch}
+        className="rounded-[8px] bg-black text-white hover:bg-gray-800"
+        size="icon"
+        >
+        <Plus className="w-4 h-4" />
+        </Button>
+      </div>
       </div>
 
       {/* Search History */}
@@ -58,8 +58,8 @@ export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettings
                 <div className="flex items-start gap-2">
                   <Search className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm truncate max-w-full" title={item.title}>
-                      {item.title}
+                    <div className="text-sm max-w-full" title={item.title}>
+                      {item.title.length > 80 ? `${item.title.slice(0, 77)}...` : item.title}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">{item.date}</div>
                   </div>
