@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 
 /**
  * Human-Centered User Flow Tests
@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test'
  */
 
 // Helper to login
-async function login(page: any, email: string, password: string) {
+async function login(page: Page, email: string, password: string) {
   await page.goto('/')
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(password)

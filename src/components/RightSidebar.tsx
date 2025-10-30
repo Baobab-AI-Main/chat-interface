@@ -1,4 +1,4 @@
-import { Calendar, ExternalLink, FileText, Package, User, DollarSign } from "lucide-react";
+import { Calendar, ExternalLink, FileText, User, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { ScrollArea } from "./ui/scroll-area";

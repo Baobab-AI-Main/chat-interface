@@ -62,7 +62,7 @@ function CreateUserInline({ onCreate }: { onCreate: (p: { fullName: string; emai
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { user, workspace, updateProfile, uploadProfileAvatar, updateWorkspace, uploadWorkspaceLogo, isAdmin } = useAuth();
   const [profileName, setProfileName] = useState(user?.name || '');
-  const [profileEmail, setProfileEmail] = useState(user?.email || '');
+  const profileEmail = user?.email || '';
   const [workspaceName, setWorkspaceName] = useState(workspace.name);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
@@ -76,6 +76,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   }, [workspace.name]);
 
   useEffect(() => {
+    setProfileName(user?.name || '');
+  }, [user?.name]);
+
+  const getErrorMessage = (error: unknown) =>
+    error instanceof Error ? error.message : String(error);
+
+  useEffect(() => {
     if (!isAdmin && activeTab !== 'profile') {
       setActiveTab('profile');
     }
@@ -85,8 +92,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     try {
       await updateProfile({ name: profileName, email: profileEmail });
       toast('Profile updated successfully');
-    } catch (e: any) {
-      toast(`Failed to update profile: ${e.message || e}`)
+    } catch (error: unknown) {
+      toast(`Failed to update profile: ${getErrorMessage(error)}`)
     }
   };
 
@@ -95,8 +102,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     try {
       await uploadProfileAvatar(file)
       toast('Profile photo updated')
-    } catch (e: any) {
-      toast(`Failed to upload photo: ${e.message || e}`)
+    } catch (error: unknown) {
+      toast(`Failed to upload photo: ${getErrorMessage(error)}`)
     }
   }
 
@@ -106,8 +113,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       setWorkspaceLoading(true);
       await updateWorkspace({ name: workspaceName });
       toast.success('Workspace settings updated successfully');
-    } catch (e: any) {
-      toast.error(`Failed to update workspace: ${e.message || e}`);
+    } catch (error: unknown) {
+      toast.error(`Failed to update workspace: ${getErrorMessage(error)}`);
     } finally {
       setWorkspaceLoading(false);
     }
@@ -127,8 +134,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
       setLogoUploading(true);
       await uploadWorkspaceLogo(file);
       toast.success('Workspace logo updated');
-    } catch (e: any) {
-      toast.error(`Failed to upload logo: ${e.message || e}`);
+    } catch (error: unknown) {
+      toast.error(`Failed to upload logo: ${getErrorMessage(error)}`);
     } finally {
       setLogoUploading(false);
     }
@@ -217,14 +224,16 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       Add or remove users with roles
                     </p>
                   </div>
-                  <CreateUserInline onCreate={async (payload)=>{
-                    try { 
-                      await createUser(payload.email, payload.fullName, payload.role, payload.password)
-                      toast.success('User created successfully in both auth and public tables')
-                    } catch(e:any){ 
-                      toast.error(e.message||String(e)) 
-                    }
-                  }} />
+                  <CreateUserInline
+                    onCreate={async (payload) => {
+                      try {
+                        await createUser(payload.email, payload.fullName, payload.role, payload.password)
+                        toast.success('User created successfully in both auth and public tables')
+                      } catch (error: unknown) {
+                        toast.error(getErrorMessage(error))
+                      }
+                    }}
+                  />
                 </div>
 
                 {error && <div className="text-sm text-red-600">{error}</div>}
@@ -248,7 +257,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           <TableCell>
                             <Input defaultValue={u.fullName || ''} onBlur={async (e)=>{
                               const v=e.currentTarget.value.trim();
-                              if (v && v!==u.fullName){ try{ await updateUser(u.id, { fullName: v }) } catch(e:any){ toast(e.message||String(e)) } }
+                              if (v && v!==u.fullName){
+                                try {
+                                  await updateUser(u.id, { fullName: v })
+                                } catch (error: unknown) {
+                                  toast(getErrorMessage(error))
+                                }
+                              }
                             }} />
                           </TableCell>
                           <TableCell>{u.email}</TableCell>
@@ -257,7 +272,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="icon" onClick={async ()=>{
-                              try { await deleteUser(u.id) } catch(e:any){ toast(e.message||String(e)) }
+                              try {
+                                await deleteUser(u.id)
+                              } catch (error: unknown) {
+                                toast(getErrorMessage(error))
+                              }
                             }}>
                               <Trash2 className="w-4 h-4 text-red-500" />
                             </Button>

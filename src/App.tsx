@@ -188,8 +188,8 @@ function createTemporaryId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     try {
       return `temp-${crypto.randomUUID()}`;
-    } catch (_) {
-      // falls back to timestamp-based id
+    } catch (error) {
+      console.warn("Falling back to timestamp id", error);
     }
   }
   return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;

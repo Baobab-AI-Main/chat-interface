@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Send } from "lucide-react";
@@ -10,11 +10,14 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-export function ChatInput({ onSendMessage, disabled = false, placeholder = appConfig.chatInputPlaceholder }: ChatInputProps) {
+export function ChatInput({
+  onSendMessage,
+  disabled = false,
+  placeholder = appConfig.chatInputPlaceholder,
+}: ChatInputProps) {
   const [message, setMessage] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitMessage = () => {
     if (message.trim() && !disabled) {
       const payload = message.trim();
       setMessage("");
@@ -24,10 +27,15 @@ export function ChatInput({ onSendMessage, disabled = false, placeholder = appCo
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    submitMessage();
+  };
+
+  const handleKeyPress = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      submitMessage();
     }
   };
 

@@ -1,5 +1,4 @@
-import { Page, expect } from '@playwright/test'
-import path from 'path'
+import { Page, expect, type Request, type Response, type ConsoleMessage } from '@playwright/test'
 
 /**
  * Test Helpers & Fixtures for Org Branding Tests
@@ -146,18 +145,23 @@ export async function waitForToastToDisappear(page: Page, text: string | RegExp,
 /**
  * Monitor network requests for specific endpoint
  */
+export interface NetworkRequestDetails {
+  url: string
+  method: string
+  status?: number
+}
+
 export interface NetworkMonitor {
-  requests: Array<{ url: string; method: string; status?: number }>
+  requests: NetworkRequestDetails[]
   stop: () => void
 }
 
 export function monitorNetworkRequests(page: Page, urlPattern: string | RegExp): NetworkMonitor {
-  const requests: Array<{ url: string; method: string; status?: number }> = []
-  
-  const requestHandler = (request: any) => {
+  const requests: NetworkRequestDetails[] = []
+  const pattern = typeof urlPattern === 'string' ? new RegExp(urlPattern) : urlPattern
+
+  const requestHandler = (request: Request) => {
     const url = request.url()
-    const pattern = typeof urlPattern === 'string' ? new RegExp(urlPattern) : urlPattern
-    
     if (pattern.test(url)) {
       requests.push({
         url,
@@ -165,22 +169,20 @@ export function monitorNetworkRequests(page: Page, urlPattern: string | RegExp):
       })
     }
   }
-  
-  const responseHandler = (response: any) => {
+
+  const responseHandler = (response: Response) => {
     const url = response.url()
-    const pattern = typeof urlPattern === 'string' ? new RegExp(urlPattern) : urlPattern
-    
     if (pattern.test(url)) {
-      const existing = requests.find(r => r.url === url && !r.status)
+      const existing = requests.find(entry => entry.url === url && entry.status === undefined)
       if (existing) {
         existing.status = response.status()
       }
     }
   }
-  
+
   page.on('request', requestHandler)
   page.on('response', responseHandler)
-  
+
   return {
     requests,
     stop: () => {
@@ -195,15 +197,15 @@ export function monitorNetworkRequests(page: Page, urlPattern: string | RegExp):
  */
 export function monitorConsoleErrors(page: Page): { errors: string[]; stop: () => void } {
   const errors: string[] = []
-  
-  const handler = (msg: any) => {
+
+  const handler = (msg: ConsoleMessage) => {
     if (msg.type() === 'error') {
       errors.push(msg.text())
     }
   }
-  
+
   page.on('console', handler)
-  
+
   return {
     errors,
     stop: () => page.off('console', handler)

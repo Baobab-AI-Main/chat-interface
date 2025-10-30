@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -26,12 +26,14 @@ export function LoginPage() {
           setOrgLogo(data.org_logo);
           setOrgName(data.org_name || appConfig.brandFallbackName);
         }
-      } catch {}
+      } catch (error) {
+        console.error("Unable to load org branding", error);
+      }
     })();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setError('');
     setLoading(true);
     try {

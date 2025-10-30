@@ -5,6 +5,8 @@ import remarkBreaks from "remark-breaks";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { Options as RehypeSanitizeOptions } from "rehype-sanitize";
 import rehypeHighlight from "rehype-highlight";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import type { PluggableList } from "unified";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Spinner } from "./ui/spinner";
 import { cn } from "./ui/utils";
@@ -18,39 +20,48 @@ interface MessageProps {
   senderAvatar?: string;
 }
 
+type PropertyDefinition = string | [string, ...(string | number | boolean | RegExp)[]];
+type AttributeList = PropertyDefinition[];
+
+const cloneAttributes = (list?: readonly PropertyDefinition[]): AttributeList => [...(list ?? [])];
+
+const mergeAttributes = (
+  existing: readonly PropertyDefinition[] | undefined,
+  additions: AttributeList,
+): AttributeList => [...cloneAttributes(existing), ...additions];
+
 const markdownSchema: RehypeSanitizeOptions = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
-    code: [...(((defaultSchema.attributes?.code as Array<any>) ?? [])), ["className"]],
-    pre: [...(((defaultSchema.attributes?.pre as Array<any>) ?? [])), ["className"]],
-    span: [...(((defaultSchema.attributes?.span as Array<any>) ?? [])), ["className"]],
-    ul: [...(((defaultSchema.attributes?.ul as Array<any>) ?? [])), ["className"]],
-    ol: [...(((defaultSchema.attributes?.ol as Array<any>) ?? [])), ["className"]],
-    li: [...(((defaultSchema.attributes?.li as Array<any>) ?? [])), ["className"]],
-    table: [...(((defaultSchema.attributes?.table as Array<any>) ?? [])), ["className"]],
-    thead: [...(((defaultSchema.attributes?.thead as Array<any>) ?? [])), ["className"]],
-    tbody: [...(((defaultSchema.attributes?.tbody as Array<any>) ?? [])), ["className"]],
-    tr: [...(((defaultSchema.attributes?.tr as Array<any>) ?? [])), ["className"]],
-    th: [...(((defaultSchema.attributes?.th as Array<any>) ?? [])), ["className"], ["align"], ["scope"]],
-    td: [...(((defaultSchema.attributes?.td as Array<any>) ?? [])), ["className"], ["align"], ["colSpan"], ["rowSpan"]],
-    a: [
-      ...(((defaultSchema.attributes?.a as Array<any>) ?? [])),
-      ["className"],
-      ["target"],
-      ["rel"],
-    ],
+    code: mergeAttributes(defaultSchema.attributes?.code, ["className"]),
+    pre: mergeAttributes(defaultSchema.attributes?.pre, ["className"]),
+    span: mergeAttributes(defaultSchema.attributes?.span, ["className"]),
+    ul: mergeAttributes(defaultSchema.attributes?.ul, ["className"]),
+    ol: mergeAttributes(defaultSchema.attributes?.ol, ["className"]),
+    li: mergeAttributes(defaultSchema.attributes?.li, ["className"]),
+    table: mergeAttributes(defaultSchema.attributes?.table, ["className"]),
+    thead: mergeAttributes(defaultSchema.attributes?.thead, ["className"]),
+    tbody: mergeAttributes(defaultSchema.attributes?.tbody, ["className"]),
+    tr: mergeAttributes(defaultSchema.attributes?.tr, ["className"]),
+    th: mergeAttributes(defaultSchema.attributes?.th, ["className", "align", "scope"]),
+    td: mergeAttributes(defaultSchema.attributes?.td, ["className", "align", "colSpan", "rowSpan"]),
+    a: mergeAttributes(defaultSchema.attributes?.a, ["className", "target", "rel"]),
   },
-  tagNames: [
-    ...((defaultSchema.tagNames as string[]) ?? []),
-    "table",
-    "thead",
-    "tbody",
-    "tr",
-    "th",
-    "td",
-  ],
+  tagNames: Array.from(
+    new Set([
+      ...(((defaultSchema.tagNames as string[]) ?? [])),
+      "table",
+      "thead",
+      "tbody",
+      "tr",
+      "th",
+      "td",
+    ]),
+  ),
 };
+
+const rehypePlugins: PluggableList = [[rehypeSanitize, markdownSchema], rehypeHighlight];
 
 export function Message({ content, role, createdAt, senderAvatar }: MessageProps) {
   const isUser = role === "user";
@@ -62,18 +73,20 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
   }).format(new Date(createdAt));
 
   const markdownComponents: Components = {
-    a: ({ className, ...props }) => (
-      <a
-        {...props}
-        className={cn(
-          "underline underline-offset-2 hover:opacity-80",
-          isUser ? "text-white" : "text-cyan-600",
-          className
-        )}
-        target="_blank"
-        rel="noopener noreferrer"
-      />
-    ),
+    a: ({ className, children, ...props }) => (
+        <a
+          {...props}
+          className={cn(
+            "underline underline-offset-2 hover:opacity-80",
+            isUser ? "text-white" : "text-cyan-600",
+            className
+          )}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {children}
+        </a>
+      ),
     p: ({ className, children, ...props }) => (
       <p {...props} className={cn("my-3 leading-relaxed", className)}>
         {children}
@@ -140,7 +153,16 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
         {children}
       </td>
     ),
-  code: ({ inline, className, children, ...props }: any) => {
+  code: ({
+    inline,
+    className,
+    children,
+    ...props
+  }: {
+    inline?: boolean;
+    className?: string;
+    children?: ReactNode;
+  } & ComponentPropsWithoutRef<"code">) => {
       if (inline) {
         return (
           <code
@@ -191,7 +213,7 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
                 isUser ? "prose-invert" : ""
               )}
               remarkPlugins={[remarkGfm, remarkBreaks]}
-              rehypePlugins={[[rehypeSanitize, markdownSchema], rehypeHighlight] as any}
+              rehypePlugins={rehypePlugins}
               components={markdownComponents}
             >
               {content}

@@ -30,8 +30,9 @@ export function useOrg() {
       try {
         const data = await fetchOrgOnce()
         if (data) setOrg(data)
-      } catch (e: any) {
-        setError(e.message)
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err)
+        setError(message)
       } finally {
         setLoading(false)
       }

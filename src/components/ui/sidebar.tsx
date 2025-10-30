@@ -4,6 +4,7 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot@1.1.2";
 import { VariantProps, cva } from "class-variance-authority@0.7.1";
 import { PanelLeftIcon } from "lucide-react@0.487.0";
+import type { CSSProperties } from "react";
 
 import { useIsMobile } from "./use-mobile";
 import { cn } from "./utils";
@@ -602,20 +603,22 @@ function SidebarMenuBadge({
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
+  style,
   ...props
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean;
 }) {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`;
-  }, []);
+  const width = (style as CSSProperties | undefined)?.["--skeleton-width"] ?? (showIcon ? "68%" : "78%");
+  const skeletonStyle: CSSProperties = {
+    "--skeleton-width": width,
+  };
 
   return (
     <div
       data-slot="sidebar-menu-skeleton"
       data-sidebar="menu-skeleton"
       className={cn("flex h-8 items-center gap-2 rounded-md px-2", className)}
+      style={style}
       {...props}
     >
       {showIcon && (
@@ -627,11 +630,7 @@ function SidebarMenuSkeleton({
       <Skeleton
         className="h-4 max-w-(--skeleton-width) flex-1"
         data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": width,
-          } as React.CSSProperties
-        }
+        style={skeletonStyle}
       />
     </div>
   );

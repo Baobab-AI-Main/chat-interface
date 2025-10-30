@@ -73,13 +73,14 @@ export function Sidebar({
         <ScrollArea className="h-full">
           <div className="space-y-2">
             {searchHistory.map((item) => (
-              <div
+              <button
+                type="button"
                 key={item.id}
                 onClick={() => onSelectSearch(item.id)}
-                className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                  item.isActive 
-                    ? 'bg-muted border border-border' 
-                    : 'hover:bg-muted/50'
+                className={`w-full p-3 rounded-lg cursor-pointer transition-colors text-left ${
+                  item.isActive
+                    ? "bg-muted border border-border"
+                    : "hover:bg-muted/50"
                 }`}
               >
                 <div className="flex items-start gap-2">
@@ -91,7 +92,7 @@ export function Sidebar({
                     <div className="text-xs text-muted-foreground mt-1">{item.date}</div>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </ScrollArea>
