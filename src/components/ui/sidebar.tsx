@@ -608,9 +608,22 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean;
 }) {
-  const width = (style as CSSProperties | undefined)?.["--skeleton-width"] ?? (showIcon ? "68%" : "78%");
+  const skeletonId = React.useId();
+  const styleObject = style as CSSProperties | undefined;
+  const numericSeed = React.useMemo(() => {
+    const idDigits = skeletonId.replace(/\D/g, "");
+    const slice = idDigits.slice(-3);
+    return Number.parseInt(slice || "0", 10) || 0;
+  }, [skeletonId]);
+  const computedWidth = React.useMemo(() => {
+    const base = showIcon ? 48 : 56;
+    const range = 38; // keep widths between ~50-94%
+    const widthValue = Math.min(base + (numericSeed % range), 94);
+    return `${widthValue}%`;
+  }, [numericSeed, showIcon]);
+
   const skeletonStyle: CSSProperties = {
-    "--skeleton-width": width,
+    "--skeleton-width": styleObject?.["--skeleton-width"] ?? computedWidth,
   };
 
   return (

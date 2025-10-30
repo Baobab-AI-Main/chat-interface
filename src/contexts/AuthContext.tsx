@@ -175,10 +175,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const org = await fetchOrgOnce();
         if (isMounted && org) {
-          setWorkspace({
-            name: org.org_name ?? DEFAULT_WORKSPACE.name,
-            logo: org.org_logo ?? DEFAULT_WORKSPACE.logo,
-          });
+          setWorkspace((prev) => ({
+            name: org.org_name ?? prev.name,
+            logo: org.org_logo ?? prev.logo,
+          }));
         }
       } catch (error) {
         console.error("Failed to load workspace branding", error);
