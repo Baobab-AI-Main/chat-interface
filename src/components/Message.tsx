@@ -107,7 +107,7 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
         >
           {isLoadingAssistant ? (
             <div className="flex items-center justify-center">
-              <Spinner size="sm" />
+              <Spinner size="sm" className="animate-spin" />
             </div>
           ) : (
             <ReactMarkdown

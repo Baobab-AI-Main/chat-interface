@@ -8,9 +8,12 @@ import { RightSidebar, ConversationDetailEntry } from "./components/RightSidebar
 import { LoginPage } from "./components/LoginPage";
 import { SettingsDialog } from "./components/SettingsDialog";
 import { ScrollArea } from "./components/ui/scroll-area";
+import { Sheet, SheetContent } from "./components/ui/sheet";
+import { useIsMobile } from "./components/ui/use-mobile";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 import { supabase } from "./lib/supabase";
+import { formatTitle } from "./lib/title";
 import { appConfig } from "./config";
 
 interface Conversation {
@@ -98,7 +101,7 @@ function isValidAutomationResponse(data: unknown): data is N8nResponsePayload {
 function mapConversationRow(row: ConversationRow): Conversation {
   return {
     id: row.id,
-    title: row.title && row.title.trim() !== "" ? row.title : "Untitled conversation",
+    title: formatTitle(row.title ?? ""),
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? row.created_at,
   };
@@ -194,11 +197,14 @@ function createTemporaryId(): string {
 
 function AppContent() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ChatMessage[]>>({});
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const activeConversation = useMemo(
@@ -217,7 +223,7 @@ function AppContent() {
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
       .map((conversation) => ({
         id: conversation.id,
-        title: conversation.title || "Untitled conversation",
+        title: formatTitle(conversation.title || ""),
         date: new Intl.DateTimeFormat("en-GB").format(new Date(conversation.updatedAt)),
         isActive: conversation.id === activeConversationId,
       }));
@@ -323,6 +329,19 @@ function AppContent() {
     }
   }, [activeMessages]);
 
+  useEffect(() => {
+    if (!isMobile) {
+      setIsSidebarOpen(false);
+      setIsDetailsOpen(false);
+    }
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!hasDetails) {
+      setIsDetailsOpen(false);
+    }
+  }, [hasDetails]);
+
   const sidebarDetails: ConversationDetailEntry[] = useMemo(() => {
     return activeMessages
       .filter((message) => {
@@ -353,6 +372,8 @@ function AppContent() {
       }))
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [activeMessages]);
+
+  const hasDetails = sidebarDetails.length > 0;
 
   const handleNewSearch = useCallback(async () => {
     if (!user?.id) {
@@ -405,15 +426,25 @@ function AppContent() {
       }
 
       await refreshConversations({ selectId: conversation.id });
+      if (isMobile) {
+        setIsSidebarOpen(false);
+      }
     } catch (error) {
       console.error("Failed to start conversation", error);
       toast.error("We couldn't start a new conversation. Please try again.");
     }
-  }, [user?.id, persistConversationUpdates, refreshConversations]);
+  }, [user?.id, persistConversationUpdates, refreshConversations, isMobile]);
 
-  const handleSelectConversation = useCallback((conversationId: string) => {
-    setActiveConversationId(conversationId);
-  }, []);
+  const handleSelectConversation = useCallback(
+    (conversationId: string) => {
+      setActiveConversationId(conversationId);
+      if (isMobile) {
+        setIsSidebarOpen(false);
+        setIsDetailsOpen(false);
+      }
+    },
+    [isMobile]
+  );
 
   const handleSendMessage = useCallback(
     async (prompt: string) => {
@@ -430,8 +461,10 @@ function AppContent() {
         !activeConversation?.title ||
         activeConversation.title === "Untitled conversation" ||
         activeConversation.title.trim() === "";
-      const truncatedTitle = trimmed.length > 80 ? `${trimmed.slice(0, 77)}...` : trimmed;
-      const nextTitle = shouldUpdateTitle ? truncatedTitle : activeConversation?.title ?? "Untitled conversation";
+      const truncatedTitle = formatTitle(trimmed);
+      const nextTitle = shouldUpdateTitle
+        ? truncatedTitle
+        : formatTitle(activeConversation?.title ?? "");
 
       setSending(true);
 
@@ -815,18 +848,24 @@ function AppContent() {
 
   return (
     <>
-      <div className="h-screen flex bg-background">
-        <Sidebar
-          onNewSearch={handleNewSearch}
-          searchHistory={searchHistory}
-          onSelectSearch={handleSelectConversation}
-          onSettingsClick={() => setSettingsOpen(true)}
-        />
+      <div className="h-screen flex bg-background overflow-hidden">
+        {!isMobile && (
+          <Sidebar
+            onNewSearch={handleNewSearch}
+            searchHistory={searchHistory}
+            onSelectSearch={handleSelectConversation}
+            onSettingsClick={() => setSettingsOpen(true)}
+          />
+        )}
 
-        <div className="flex-1 flex flex-col items-center">
+        <div className="flex-1 flex flex-col items-center overflow-hidden">
           <div className="w-full max-w-5xl flex flex-col h-full">
             <ChatHeader
-              searchTitle={activeConversation?.title || "Untitled conversation"}
+              searchTitle={formatTitle(activeConversation?.title ?? "")}
+              isMobile={isMobile}
+              hasDetails={hasDetails}
+              onOpenSidebar={isMobile ? () => setIsSidebarOpen(true) : undefined}
+              onOpenDetails={isMobile && hasDetails ? () => setIsDetailsOpen(true) : undefined}
             />
             <ScrollArea ref={scrollAreaRef} className="flex-1 h-0">
               <div className="p-6 space-y-1">
@@ -855,9 +894,31 @@ function AppContent() {
             <ChatInput onSendMessage={handleSendMessage} disabled={sending || !activeConversationId} />
           </div>
         </div>
-
-        <RightSidebar details={activeConversationId ? sidebarDetails : []} />
+        {!isMobile && <RightSidebar details={activeConversationId ? sidebarDetails : []} />}
       </div>
+
+      {isMobile && (
+        <>
+          <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+            <SheetContent side="left" className="p-0">
+              <Sidebar
+                onNewSearch={handleNewSearch}
+                searchHistory={searchHistory}
+                onSelectSearch={handleSelectConversation}
+                onSettingsClick={() => setSettingsOpen(true)}
+                mode="drawer"
+                onClose={() => setIsSidebarOpen(false)}
+              />
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={isDetailsOpen && hasDetails} onOpenChange={setIsDetailsOpen}>
+            <SheetContent side="right" className="p-0">
+              <RightSidebar details={sidebarDetails} />
+            </SheetContent>
+          </Sheet>
+        </>
+      )}
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <Toaster />

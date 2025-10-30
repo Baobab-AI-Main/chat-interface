@@ -1,8 +1,9 @@
 import { Button } from "./ui/button";
-import { Plus, Search, Clock, Settings, LogOut } from "lucide-react";
+import { Plus, Search, Clock, Settings, LogOut, X } from "lucide-react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { useAuth } from "../contexts/AuthContext";
+import { formatTitle } from "../lib/title";
 
 interface SearchHistoryItem {
   id: string;
@@ -16,17 +17,43 @@ interface SidebarProps {
   searchHistory: SearchHistoryItem[];
   onSelectSearch: (searchId: string) => void;
   onSettingsClick: () => void;
+  mode?: "inline" | "drawer";
+  onClose?: () => void;
 }
 
-export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettingsClick }: SidebarProps) {
+export function Sidebar({
+  onNewSearch,
+  searchHistory,
+  onSelectSearch,
+  onSettingsClick,
+  mode = "inline",
+  onClose,
+}: SidebarProps) {
   const { user, workspace, logout } = useAuth();
+  const isDrawer = mode === "drawer";
+  const containerClasses = isDrawer
+    ? "w-full bg-card flex flex-col h-full"
+    : "min-w-0 max-w-[25%] basis-[25%] flex-shrink-0 bg-card border-r flex flex-col h-full";
 
   return (
-    <div className="min-w-0 max-w-[25%] basis-[25%] flex-shrink-0 bg-card border-r flex flex-col h-full">
+    <div className={containerClasses}>
       {/* Logo and Header */}
-      <div className="p-4 border-b">
-        <div className="flex items-center justify-between">
-          <img src={workspace.logo} alt={workspace.name} className="h-8 max-w-full object-contain" />
+      <div className={`p-4 border-b ${isDrawer ? "pt-3" : ""}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {isDrawer && onClose && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="-ml-1"
+                title="Close sidebar"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+            <img src={workspace.logo} alt={workspace.name} className="h-8 max-w-full object-contain" />
+          </div>
           <Button
             onClick={onNewSearch}
             className="rounded-[8px] bg-black text-white hover:bg-gray-800"
@@ -59,7 +86,7 @@ export function Sidebar({ onNewSearch, searchHistory, onSelectSearch, onSettings
                   <Search className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm max-w-full truncate" title={item.title}>
-                      {item.title.length > 80 ? `${item.title.slice(0, 77)}...` : item.title}
+                      {formatTitle(item.title)}
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">{item.date}</div>
                   </div>
