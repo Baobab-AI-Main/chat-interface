@@ -2,7 +2,7 @@ import { Button } from "./ui/button";
 import { Plus, Search, Clock, Settings, LogOut, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { ScrollArea } from "./ui/scroll-area";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { useAuth } from "../contexts/AuthContext";
 import { formatTitle } from "../lib/title";
 
@@ -110,8 +110,15 @@ export function Sidebar({
       <div className="p-4 border-t space-y-2">
         <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50">
           <Avatar className="h-8 w-8">
+            {user?.avatar ? (
+              <AvatarImage
+                key={user.avatar}
+                src={user.avatar}
+                alt={user.name ? `${user.name}'s avatar` : "User avatar"}
+              />
+            ) : null}
             <AvatarFallback className="bg-slate-200 text-xs">
-              {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
+              {user?.name?.split(" ").map((n) => n[0]).join("")?.toUpperCase() || "U"}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
