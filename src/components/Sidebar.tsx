@@ -1,5 +1,6 @@
+import { ChatBubbleLeftIcon } from "@heroicons/react/24/outline";
 import { Button } from "./ui/button";
-import { Plus, Search, Clock, Settings, LogOut, X } from "lucide-react";
+import { Plus, Clock, Settings, LogOut, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { ScrollArea } from "./ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
@@ -92,7 +93,7 @@ export function Sidebar({
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  <Search className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <ChatBubbleLeftIcon className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm max-w-full truncate" title={item.title}>
                       {formatTitle(item.title)}
