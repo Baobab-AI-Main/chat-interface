@@ -56,13 +56,14 @@ export function RightSidebar({ details }: RightSidebarProps) {
   }
 
   return (
-    <aside className="w-80 bg-card border-l flex flex-col h-full">
+    <aside className="w-80 bg-card border-l flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b">
         <h2 className="text-sm font-medium text-muted-foreground">Conversation Details</h2>
       </div>
 
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="p-4 space-y-4">
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-4">
           {details.length === 0 && (
             <div className="text-sm text-muted-foreground">
               No external order or invoice data yet for this conversation.
@@ -169,8 +170,9 @@ export function RightSidebar({ details }: RightSidebarProps) {
               )}
             </div>
           ))}
-        </div>
-      </ScrollArea>
+          </div>
+        </ScrollArea>
+      </div>
     </aside>
   );
 }
