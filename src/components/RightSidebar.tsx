@@ -1,7 +1,6 @@
 import { Calendar, ExternalLink, FileText, User, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { ScrollArea } from "./ui/scroll-area";
 import { appConfig } from "../config";
 
 export interface SparklayerOrderDetail {
@@ -61,9 +60,8 @@ export function RightSidebar({ details }: RightSidebarProps) {
         <h2 className="text-sm font-medium text-muted-foreground">Conversation Details</h2>
       </div>
 
-      <div className="flex-1 min-h-0">
-        <ScrollArea className="h-full">
-          <div className="p-4 space-y-4">
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="p-4 space-y-4">
           {details.length === 0 && (
             <div className="text-sm text-muted-foreground">
               No external order or invoice data yet for this conversation.
@@ -170,8 +168,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
               )}
             </div>
           ))}
-          </div>
-        </ScrollArea>
+        </div>
       </div>
     </aside>
   );
