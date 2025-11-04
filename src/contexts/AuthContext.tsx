@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchProfile = useCallback(async (uid: string) => {
     const { data, error } = await supabase
-      .from<UsersRow>("users")
+      .from("users")
       .select('id, email, role, "Full Name", "Profile_Photo", user_id')
       .eq("user_id", uid)
       .maybeSingle();
@@ -84,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
 
     if (data) {
-      setUser(mapUserRowToProfile(data));
+      setUser(mapUserRowToProfile(data as UsersRow));
       return;
     }
 
@@ -98,36 +98,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const { data: existingUser } = await supabase
-      .from<UsersRow>("users")
+      .from("users")
       .select('id, email, role, "Full Name", "Profile_Photo", user_id')
       .eq("email", email)
       .is("user_id", null)
       .maybeSingle();
 
-    if (existingUser) {
+    const existingUserRow = existingUser as UsersRow | null;
+
+    if (existingUserRow) {
       const { data: updated, error: updateError } = await supabase
-        .from<UsersRow>("users")
+        .from("users")
         .update({ user_id: uid })
-        .eq("id", existingUser.id)
+        .eq("id", existingUserRow.id)
         .select('id, email, role, "Full Name", "Profile_Photo", user_id')
         .single();
 
       if (updateError) throw updateError;
       if (updated) {
-        setUser(mapUserRowToProfile(updated));
+        setUser(mapUserRowToProfile(updated as UsersRow));
       }
       return;
     }
 
     const { data: inserted, error: insertError } = await supabase
-      .from<UsersRow>("users")
+      .from("users")
       .insert({ user_id: uid, email, role: "user" })
       .select('id, email, role, "Full Name", "Profile_Photo", user_id')
       .single();
 
     if (insertError) throw insertError;
-    if (inserted) {
-      setUser(mapUserRowToProfile(inserted));
+    const insertedRow = inserted as UsersRow | null;
+    if (insertedRow) {
+      setUser(mapUserRowToProfile(insertedRow));
     }
   }, []);
 
@@ -212,7 +215,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
       });
-      if (error) throw error;
+      if (error) {
+        console.error("Failed to sign in", error);
+        throw new Error("Unable to log you in, please check with your administrator");
+      }
       const sessionUser = data.user;
       if (sessionUser) {
         try {
@@ -261,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const { data, error } = await supabase
-        .from<UsersRow>("users")
+        .from("users")
         .update(payload)
         .eq("id", user.id)
         .select('id, email, role, "Full Name", "Profile_Photo", user_id')
@@ -269,7 +275,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
       if (data) {
-        setUser(mapUserRowToProfile(data));
+        setUser(mapUserRowToProfile(data as UsersRow));
       }
     },
     [user],
@@ -304,16 +310,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const updateWorkspace = useCallback(
     async (updates: Partial<Workspace>) => {
-      const { data, error } = await supabase.rpc<OrgRow>("upsert_org", {
+      const { data, error } = await supabase.rpc("upsert_org", {
         p_name: updates.name ?? null,
         p_logo: updates.logo ?? null,
       });
       if (error) throw error;
 
       if (data) {
+        const orgData = data as OrgRow;
         const updatedWorkspace: Workspace = {
-          name: data.org_name ?? workspace.name,
-          logo: data.org_logo ?? workspace.logo,
+          name: orgData.org_name ?? workspace.name,
+          logo: orgData.org_logo ?? workspace.logo,
         };
         setWorkspace(updatedWorkspace);
         return updatedWorkspace;

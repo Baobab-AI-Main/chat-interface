@@ -39,7 +39,8 @@ export function LoginPage() {
     try {
       await auth.login(email, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      console.error('Login attempt failed', err);
+      setError('Unable to log you in, please check with your administrator');
     } finally {
       setLoading(false);
     }
