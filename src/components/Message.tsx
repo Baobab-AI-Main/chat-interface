@@ -61,7 +61,7 @@ const markdownSchema: RehypeSanitizeOptions = {
   ),
 };
 
-const rehypePlugins: PluggableList = [[rehypeSanitize, markdownSchema], rehypeHighlight];
+const rehypePlugins = [[rehypeSanitize, markdownSchema], rehypeHighlight] as PluggableList;
 
 export function Message({ content, role, createdAt, senderAvatar }: MessageProps) {
   const isUser = role === "user";

@@ -92,6 +92,22 @@ type MessageRow = {
   created_at: string;
 };
 
+type ChatMessageDetailRow = {
+  id: string;
+  message_id: string | null;
+  detail_type: "order" | "invoice";
+  order_id: string | null;
+  order_customer: string | null;
+  order_date: string | null;
+  order_link: string | null;
+  invoice_id: string | null;
+  invoice_amount_due: number | null;
+  invoice_status: XeroInvoiceStatus | null;
+  invoice_link: string | null;
+  created_at: string;
+  conversation_id: string | null;
+};
+
 function isValidAutomationResponse(data: unknown): data is N8nResponsePayload {
   if (typeof data !== "object" || data === null) return false;
   const payload = data as Record<string, unknown>;
@@ -124,6 +140,45 @@ function mapMessageRow(row: MessageRow): ChatMessage {
   }
 
   return message;
+}
+
+function mapDetailRow(row: ChatMessageDetailRow): ConversationDetailEntry {
+  const entry: ConversationDetailEntry = {
+    id: row.id,
+    createdAt: row.created_at,
+    order: null,
+    invoice: null,
+  };
+
+  if (row.order_id || row.detail_type === "order") {
+    const hasOrderData = row.order_id || row.order_customer || row.order_date || row.order_link;
+    if (hasOrderData) {
+      entry.order = {
+        orderId: row.order_id,
+        customer: row.order_customer,
+        date: row.order_date,
+        link: row.order_link,
+      };
+    }
+  }
+
+  if (row.invoice_id || row.detail_type === "invoice") {
+    const hasInvoiceData =
+      row.invoice_id ||
+      row.invoice_amount_due !== null ||
+      row.invoice_status ||
+      row.invoice_link;
+    if (hasInvoiceData) {
+      entry.invoice = {
+        invoiceId: row.invoice_id,
+        amountDue: row.invoice_amount_due,
+        status: row.invoice_status,
+        link: row.invoice_link,
+      };
+    }
+  }
+
+  return entry;
 }
 
 function sortMessagesByCreatedAt(messages: ChatMessage[]): ChatMessage[] {
@@ -200,6 +255,7 @@ function AppContent() {
   const isMobile = useIsMobile();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messagesByConversation, setMessagesByConversation] = useState<Record<string, ChatMessage[]>>({});
+  const [detailsByConversation, setDetailsByConversation] = useState<Record<string, ConversationDetailEntry[]>>({});
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sending, setSending] = useState(false);
@@ -242,6 +298,37 @@ function AppContent() {
     []
   );
 
+  const fetchConversationDetails = useCallback(async (conversationId: string) => {
+    const { data, error } = await supabase
+      .from("chat_message_details")
+      .select(
+        "id, message_id, detail_type, order_id, order_customer, order_date, order_link, invoice_id, invoice_amount_due, invoice_status, invoice_link, created_at, conversation_id"
+      )
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true });
+
+    if (error) throw error;
+
+    return (data ?? [])
+      .map((row) => mapDetailRow(row as ChatMessageDetailRow))
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+  }, []);
+
+  const updateDetailsForConversation = useCallback(
+    async (conversationId: string) => {
+      try {
+        const details = await fetchConversationDetails(conversationId);
+        setDetailsByConversation((prev) => ({
+          ...prev,
+          [conversationId]: details,
+        }));
+      } catch (error) {
+        console.error("Failed to refresh conversation details", error);
+      }
+    },
+    [fetchConversationDetails]
+  );
+
   const refreshConversations = useCallback(
     async (options?: { selectId?: string }) => {
       if (!user?.id) return;
@@ -278,6 +365,7 @@ function AppContent() {
     if (!user?.id) {
       setConversations([]);
       setMessagesByConversation({});
+      setDetailsByConversation({});
       setActiveConversationId(null);
       return;
     }
@@ -321,6 +409,34 @@ function AppContent() {
   }, [activeConversationId, user?.id]);
 
   useEffect(() => {
+    if (!activeConversationId || !user?.id) return;
+
+    let isCancelled = false;
+    const conversationId = activeConversationId;
+
+    const loadDetails = async () => {
+      try {
+        const details = await fetchConversationDetails(conversationId);
+        if (isCancelled) return;
+        setDetailsByConversation((prev) => ({
+          ...prev,
+          [conversationId]: details,
+        }));
+      } catch (error) {
+        if (isCancelled) return;
+        console.error("Failed to load conversation details", error);
+        toast.error("We couldn't load conversation details.");
+      }
+    };
+
+    void loadDetails();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activeConversationId, user?.id, fetchConversationDetails]);
+
+  useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollContainer = scrollAreaRef.current.querySelector("[data-radix-scroll-area-viewport]");
       if (scrollContainer) {
@@ -337,35 +453,9 @@ function AppContent() {
   }, [isMobile]);
 
   const sidebarDetails: ConversationDetailEntry[] = useMemo(() => {
-    return activeMessages
-      .filter((message) => {
-        const payload = message.payload;
-        return (
-          !!payload?.order_from_sparklayer || !!payload?.invoice_from_xero
-        );
-      })
-      .map((message) => ({
-        messageId: message.id,
-        createdAt: message.createdAt,
-        order: message.payload?.order_from_sparklayer
-          ? {
-              orderId: message.payload.order_from_sparklayer.order_id,
-              customer: message.payload.order_from_sparklayer.customer,
-              date: message.payload.order_from_sparklayer.date,
-              link: message.payload.order_from_sparklayer.link ?? null,
-            }
-          : null,
-        invoice: message.payload?.invoice_from_xero
-          ? {
-              invoiceId: message.payload.invoice_from_xero.invoice_id,
-              amountDue: message.payload.invoice_from_xero.amount_due,
-              status: message.payload.invoice_from_xero.status,
-              link: message.payload.invoice_from_xero.link ?? null,
-            }
-          : null,
-      }))
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [activeMessages]);
+    if (!activeConversationId) return [];
+    return detailsByConversation[activeConversationId] ?? [];
+  }, [detailsByConversation, activeConversationId]);
 
   const hasDetails = sidebarDetails.length > 0;
 
@@ -595,6 +685,7 @@ function AppContent() {
             console.error("Failed to persist conversation metadata after automation message", metadataError);
           }
 
+          void updateDetailsForConversation(conversationId);
           await refreshConversations({ selectId: conversationId });
           return;
         }
@@ -761,6 +852,7 @@ function AppContent() {
           console.error("Failed to persist conversation metadata after automation message", metadataError);
         }
 
+        void updateDetailsForConversation(conversationId);
         await refreshConversations({ selectId: conversationId });
       } catch (error) {
         if (provisionalId) {
@@ -822,6 +914,7 @@ function AppContent() {
             console.error("Failed to persist conversation metadata after automation failure", metadataError);
           }
 
+          void updateDetailsForConversation(conversationId);
           await refreshConversations({ selectId: conversationId });
         } catch (loggingError) {
           console.error("Failed to log automation failure", loggingError);
@@ -839,6 +932,7 @@ function AppContent() {
       activeConversation,
       persistConversationUpdates,
       refreshConversations,
+      updateDetailsForConversation,
     ]
   );
 

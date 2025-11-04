@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Badge } from './ui/badge';
 import { useAuth } from '../contexts/AuthContext';
@@ -163,6 +163,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <TabsContent value="profile" className="space-y-6 mt-0">
               <div className="flex items-center gap-4">
                   <Avatar className="h-20 w-20">
+                    {user?.avatar ? (
+                      <AvatarImage
+                        key={user.avatar}
+                        src={user.avatar}
+                        alt={user.name ? `${user.name}'s avatar` : 'User avatar'}
+                        className="object-cover"
+                      />
+                    ) : null}
                     <AvatarFallback className="bg-slate-200">
                       <User className="h-10 w-10 text-slate-600" />
                     </AvatarFallback>

@@ -622,9 +622,9 @@ function SidebarMenuSkeleton({
     return `${widthValue}%`;
   }, [numericSeed, showIcon]);
 
-  const skeletonStyle: CSSProperties = {
-    "--skeleton-width": styleObject?.["--skeleton-width"] ?? computedWidth,
-  };
+  const skeletonStyle = {
+    "--skeleton-width": styleObject?.["--skeleton-width" as keyof CSSProperties] ?? computedWidth,
+  } as React.CSSProperties;
 
   return (
     <div
