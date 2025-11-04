@@ -68,40 +68,66 @@ export function useUsers(enabled: boolean = true) {
     if (!enabled) {
       throw new Error('User management is restricted')
     }
-    if (!supabaseAdmin) {
-      throw new Error('Admin operations are currently unavailable')
-    }
+    const trimmedEmail = email.trim()
+    const cleanedFullName = fullName.trim() || null
+    let createdProfile: SupabaseUserRow | null = null
 
-    const { data: created, error: adminError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        role,
-        full_name: fullName,
-      },
-    })
-
-    if (adminError) throw adminError
-    const newUserId = created?.user?.id
-    if (!newUserId) {
-      throw new Error('Failed to create user account')
-    }
-
-    const { data: userRow, error: publicError } = await supabase
-      .from('users')
-      .insert({
-        user_id: newUserId,
-        email,
-        role,
-        "Full Name": fullName || null,
+    if (supabaseAdmin) {
+      const { data: created, error: adminError } = await supabaseAdmin.auth.admin.createUser({
+        email: trimmedEmail,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          role,
+          full_name: cleanedFullName,
+        },
       })
-      .select('id, user_id, email, role, "Full Name", "Profile_Photo"')
-      .single()
 
-    if (publicError) throw publicError
-    if (userRow) {
-      setUsers(prev => [toAppUser(userRow as SupabaseUserRow), ...prev])
+      if (adminError) {
+        const message = adminError.message?.toLowerCase() ?? ''
+        const isPermissionError = adminError.status === 403 || message.includes('not allowed') || message.includes('not_admin')
+
+        if (!isPermissionError) {
+          throw adminError
+        }
+        console.warn('Supabase admin API unavailable, falling back to SQL RPC:', adminError)
+      } else {
+        const newUserId = created?.user?.id
+        if (!newUserId) {
+          throw new Error('Failed to create user account')
+        }
+
+        const { data: userRow, error: publicError } = await supabase
+          .from('users')
+          .insert({
+            user_id: newUserId,
+            email: trimmedEmail,
+            role,
+            "Full Name": cleanedFullName,
+          })
+          .select('id, user_id, email, role, "Full Name", "Profile_Photo"')
+          .single()
+
+        if (publicError) throw publicError
+        createdProfile = (userRow as SupabaseUserRow | null) ?? null
+      }
+    }
+
+    if (!createdProfile) {
+      const { data: fallbackRow, error: fallbackError } = await supabase.rpc('admin_create_user_complete', {
+        p_email: trimmedEmail,
+        p_password: password,
+        p_role: role,
+        p_full_name: cleanedFullName,
+      })
+      if (fallbackError) {
+        throw fallbackError
+      }
+      createdProfile = (fallbackRow as SupabaseUserRow | null) ?? null
+    }
+
+    if (createdProfile) {
+      setUsers(prev => [toAppUser(createdProfile), ...prev])
     } else {
       await fetchUsers()
     }
