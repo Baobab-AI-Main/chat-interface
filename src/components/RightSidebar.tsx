@@ -61,7 +61,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
         <h2 className="text-sm font-medium text-muted-foreground">Conversation Details</h2>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="p-4 space-y-4">
           {details.length === 0 && (
             <div className="text-sm text-muted-foreground">
