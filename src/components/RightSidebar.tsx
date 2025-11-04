@@ -1,25 +1,24 @@
 import { Calendar, ExternalLink, FileText, User, DollarSign } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { ScrollArea } from "./ui/scroll-area";
 import { appConfig } from "../config";
 
 export interface SparklayerOrderDetail {
-  orderId: string;
-  customer: string;
-  date: string;
+  orderId?: string | null;
+  customer?: string | null;
+  date?: string | null;
   link?: string | null;
 }
 
 export interface XeroInvoiceDetail {
-  invoiceId: string;
-  amountDue: number;
-  status: "draft" | "submitted" | "authorised" | "paid" | "voided" | "deleted";
+  invoiceId?: string | null;
+  amountDue?: number | null;
+  status?: "draft" | "submitted" | "authorised" | "paid" | "voided" | "deleted" | null;
   link?: string | null;
 }
 
 export interface ConversationDetailEntry {
-  messageId: string;
+  id: string;
   createdAt: string;
   order?: SparklayerOrderDetail | null;
   invoice?: XeroInvoiceDetail | null;
@@ -29,7 +28,8 @@ interface RightSidebarProps {
   details: ConversationDetailEntry[];
 }
 
-function formatDate(value: string) {
+function formatDate(value?: string | null) {
+  if (!value) return "—";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   const hasTimeComponent = value.includes("T");
@@ -39,7 +39,8 @@ function formatDate(value: string) {
   }).format(date);
 }
 
-function formatAmount(amount: number) {
+function formatAmount(amount?: number | null) {
+  if (amount === undefined || amount === null) return "—";
   return new Intl.NumberFormat(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -54,12 +55,12 @@ export function RightSidebar({ details }: RightSidebarProps) {
   }
 
   return (
-    <aside className="w-80 bg-card border-l flex flex-col h-full">
+    <aside className="w-80 bg-card border-l flex flex-col h-full overflow-hidden">
       <div className="p-4 border-b">
         <h2 className="text-sm font-medium text-muted-foreground">Conversation Details</h2>
       </div>
 
-      <ScrollArea className="flex-1">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="p-4 space-y-4">
           {details.length === 0 && (
             <div className="text-sm text-muted-foreground">
@@ -68,7 +69,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
           )}
 
           {details.map((entry) => (
-            <div key={entry.messageId} className="space-y-3">
+            <div key={entry.id} className="space-y-3">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {formatDate(entry.createdAt)}
               </div>
@@ -85,18 +86,24 @@ export function RightSidebar({ details }: RightSidebarProps) {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-4 pt-0 pb-4 space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <FileText className="w-4 h-4" />
-                      <span className="font-medium text-foreground">{entry.order.orderId}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <User className="w-4 h-4" />
-                      <span>{entry.order.customer}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Calendar className="w-4 h-4" />
-                      <span>{formatDate(entry.order.date)}</span>
-                    </div>
+                    {entry.order.orderId && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <FileText className="w-4 h-4" />
+                        <span className="font-medium text-foreground">{entry.order.orderId}</span>
+                      </div>
+                    )}
+                    {entry.order.customer && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <User className="w-4 h-4" />
+                        <span>{entry.order.customer}</span>
+                      </div>
+                    )}
+                    {entry.order.date && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Calendar className="w-4 h-4" />
+                        <span>{formatDate(entry.order.date)}</span>
+                      </div>
+                    )}
                     {entry.order.link && (
                       <a
                         href={entry.order.link}
@@ -124,22 +131,28 @@ export function RightSidebar({ details }: RightSidebarProps) {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="px-4 pt-0 pb-4 space-y-2 text-sm">
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <FileText className="w-4 h-4" />
-                      <span className="font-medium text-foreground">{entry.invoice.invoiceId}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <DollarSign className="w-4 h-4" />
-                      <span>
-                        {currencySymbol}
-                        {formatAmount(entry.invoice.amountDue)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Badge variant="outline" className="text-xs uppercase">
-                        {entry.invoice.status}
-                      </Badge>
-                    </div>
+                    {entry.invoice.invoiceId && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <FileText className="w-4 h-4" />
+                        <span className="font-medium text-foreground">{entry.invoice.invoiceId}</span>
+                      </div>
+                    )}
+                    {entry.invoice.amountDue !== undefined && entry.invoice.amountDue !== null && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <DollarSign className="w-4 h-4" />
+                        <span>
+                          {currencySymbol}
+                          {formatAmount(entry.invoice.amountDue)}
+                        </span>
+                      </div>
+                    )}
+                    {entry.invoice.status && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Badge variant="outline" className="text-xs uppercase">
+                          {entry.invoice.status}
+                        </Badge>
+                      </div>
+                    )}
                     {entry.invoice.link && (
                       <a
                         href={entry.invoice.link}
@@ -156,7 +169,7 @@ export function RightSidebar({ details }: RightSidebarProps) {
             </div>
           ))}
         </div>
-      </ScrollArea>
+      </div>
     </aside>
   );
 }
