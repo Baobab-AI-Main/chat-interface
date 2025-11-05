@@ -5,7 +5,7 @@ import remarkBreaks from "remark-breaks";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import type { Options as RehypeSanitizeOptions } from "rehype-sanitize";
 import rehypeHighlight from "rehype-highlight";
-import type { ComponentPropsWithoutRef, ReactNode } from "react";
+import { useEffect, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import type { PluggableList } from "unified";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Spinner } from "./ui/spinner";
@@ -66,6 +66,26 @@ const rehypePlugins = [[rehypeSanitize, markdownSchema], rehypeHighlight] as Plu
 export function Message({ content, role, createdAt, senderAvatar }: MessageProps) {
   const isUser = role === "user";
   const isLoadingAssistant = role === "assistant" && content.trim() === "";
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoadingAssistant) {
+      setStatusMessage(null);
+      return;
+    }
+
+    setStatusMessage(null);
+    const thinkingTimeout = window.setTimeout(() => setStatusMessage("Thinking"), 15000);
+    const queryingTimeout = window.setTimeout(
+      () => setStatusMessage("Running queries on Attio"),
+      30000,
+    );
+
+    return () => {
+      window.clearTimeout(thinkingTimeout);
+      window.clearTimeout(queryingTimeout);
+    };
+  }, [isLoadingAssistant]);
 
   const formattedTime = new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
@@ -203,8 +223,13 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
           }`}
         >
           {isLoadingAssistant ? (
-            <div className="flex items-center justify-center">
+            <div className="flex items-center justify-center gap-2">
               <Spinner size="sm" />
+              {statusMessage ? (
+                <span className="text-sm text-muted-foreground animate-pulse">
+                  {statusMessage}
+                </span>
+              ) : null}
             </div>
           ) : (
             <ReactMarkdown

@@ -617,7 +617,14 @@ function AppContent() {
         return;
       }
 
+      const abortController = new AbortController();
+      let timeoutId: number | null = null;
+
       try {
+        timeoutId = window.setTimeout(() => {
+          abortController.abort();
+        }, appConfig.automationTimeoutMs);
+
         const response = await fetch(automationEndpoint, {
           method: "POST",
           headers: {
@@ -627,6 +634,7 @@ function AppContent() {
             prompt: trimmed,
             conversation_id: conversationId,
           }),
+          signal: abortController.signal,
         });
 
         if (!response.ok) {
@@ -867,9 +875,13 @@ function AppContent() {
 
         console.error("Automation request failed", error);
         const fallbackContent =
-          error instanceof Error
-            ? `I couldn't reach the automation service: ${error.message}`
-            : "I couldn't reach the automation service due to an unknown error.";
+          error instanceof DOMException && error.name === "AbortError"
+            ? `The automation response took longer than ${Math.ceil(
+                appConfig.automationTimeoutMs / 1000
+              )} seconds. Please try again.`
+            : error instanceof Error
+              ? `I couldn't reach the automation service: ${error.message}`
+              : "I couldn't reach the automation service due to an unknown error.";
 
         try {
           const { data: assistantRow, error: assistantInsertError } = await supabase
@@ -923,6 +935,9 @@ function AppContent() {
 
         toast.error("Automation request failed. Please try again.");
       } finally {
+        if (timeoutId !== null) {
+          window.clearTimeout(timeoutId);
+        }
         setSending(false);
       }
     },
