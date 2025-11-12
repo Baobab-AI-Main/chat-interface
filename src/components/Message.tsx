@@ -1,211 +1,44 @@
-import ReactMarkdown from "react-markdown";
-import type { Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkBreaks from "remark-breaks";
-import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
-import type { Options as RehypeSanitizeOptions } from "rehype-sanitize";
-import rehypeHighlight from "rehype-highlight";
-import { useEffect, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
-import type { PluggableList } from "unified";
+import { useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Spinner } from "./ui/spinner";
-import { cn } from "./ui/utils";
-import "highlight.js/styles/github-dark.css";
 import { appConfig } from "../config";
+import { Markdown } from "./Markdown";
+import "./Message.css";
 
 interface MessageProps {
+  id: string;
   content: string;
   role: "user" | "assistant" | "system";
   createdAt: string;
   senderAvatar?: string;
 }
 
-type PropertyDefinition = string | [string, ...(string | number | boolean | RegExp)[]];
-type AttributeList = PropertyDefinition[];
-
-const cloneAttributes = (list?: readonly PropertyDefinition[]): AttributeList => [...(list ?? [])];
-
-const mergeAttributes = (
-  existing: readonly PropertyDefinition[] | undefined,
-  additions: AttributeList,
-): AttributeList => [...cloneAttributes(existing), ...additions];
-
-const markdownSchema: RehypeSanitizeOptions = {
-  ...defaultSchema,
-  attributes: {
-    ...defaultSchema.attributes,
-    code: mergeAttributes(defaultSchema.attributes?.code, ["className"]),
-    pre: mergeAttributes(defaultSchema.attributes?.pre, ["className"]),
-    span: mergeAttributes(defaultSchema.attributes?.span, ["className"]),
-    ul: mergeAttributes(defaultSchema.attributes?.ul, ["className"]),
-    ol: mergeAttributes(defaultSchema.attributes?.ol, ["className"]),
-    li: mergeAttributes(defaultSchema.attributes?.li, ["className"]),
-    table: mergeAttributes(defaultSchema.attributes?.table, ["className"]),
-    thead: mergeAttributes(defaultSchema.attributes?.thead, ["className"]),
-    tbody: mergeAttributes(defaultSchema.attributes?.tbody, ["className"]),
-    tr: mergeAttributes(defaultSchema.attributes?.tr, ["className"]),
-    th: mergeAttributes(defaultSchema.attributes?.th, ["className", "align", "scope"]),
-    td: mergeAttributes(defaultSchema.attributes?.td, ["className", "align", "colSpan", "rowSpan"]),
-    a: mergeAttributes(defaultSchema.attributes?.a, ["className", "target", "rel"]),
-  },
-  tagNames: Array.from(
-    new Set([
-      ...(((defaultSchema.tagNames as string[]) ?? [])),
-      "table",
-      "thead",
-      "tbody",
-      "tr",
-      "th",
-      "td",
-    ]),
-  ),
-};
-
-const rehypePlugins = [[rehypeSanitize, markdownSchema], rehypeHighlight] as PluggableList;
-
-export function Message({ content, role, createdAt, senderAvatar }: MessageProps) {
+export function Message({ id, content, role, createdAt, senderAvatar }: MessageProps) {
   const isUser = role === "user";
-  const isLoadingAssistant = role === "assistant" && content.trim() === "";
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const isProvisionalAssistant = role === "assistant" && id.startsWith("temp-");
+  const hasContent = content.trim() !== "";
+  const shouldShowSpinner = role === "assistant" && (isProvisionalAssistant || !hasContent);
+  const [showThinking, setShowThinking] = useState(false);
 
   useEffect(() => {
-    if (!isLoadingAssistant) {
-      setStatusMessage(null);
-      return;
+    let timer: number | undefined;
+
+    if (shouldShowSpinner) {
+      timer = window.setTimeout(() => setShowThinking(true), 5000);
     }
 
-    setStatusMessage(null);
-    const thinkingTimeout = window.setTimeout(() => setStatusMessage("Thinking"), 15000);
-    const queryingTimeout = window.setTimeout(
-      () => setStatusMessage("Running queries on Attio"),
-      30000,
-    );
-
     return () => {
-      window.clearTimeout(thinkingTimeout);
-      window.clearTimeout(queryingTimeout);
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+      }
+      setShowThinking(false);
     };
-  }, [isLoadingAssistant]);
+  }, [shouldShowSpinner]);
 
   const formattedTime = new Intl.DateTimeFormat(undefined, {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(createdAt));
-
-  const markdownComponents: Components = {
-    a: ({ className, children, ...props }) => (
-        <a
-          {...props}
-          className={cn(
-            "underline underline-offset-2 hover:opacity-80",
-            isUser ? "text-white" : "text-cyan-600",
-            className
-          )}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {children}
-        </a>
-      ),
-    p: ({ className, children, ...props }) => (
-      <p {...props} className={cn("my-3 leading-relaxed", className)}>
-        {children}
-      </p>
-    ),
-    ul: ({ className, children, ...props }) => (
-      <ul {...props} className={cn("my-3 list-disc space-y-2 pl-6", className)}>
-        {children}
-      </ul>
-    ),
-    ol: ({ className, children, ...props }) => (
-      <ol {...props} className={cn("my-3 list-decimal space-y-2 pl-6", className)}>
-        {children}
-      </ol>
-    ),
-    li: ({ className, children, ...props }) => (
-      <li {...props} className={cn("leading-relaxed", className)}>
-        {children}
-      </li>
-    ),
-    blockquote: ({ className, children, ...props }) => (
-      <blockquote
-        {...props}
-        className={cn("my-4 border-l-4 border-muted-foreground/40 pl-4 italic", className)}
-      >
-        {children}
-      </blockquote>
-    ),
-    table: ({ className, children, ...props }) => (
-      <div className="my-4 w-full overflow-x-auto">
-        <table {...props} className={cn("w-full border-collapse text-sm", className)}>
-          {children}
-        </table>
-      </div>
-    ),
-    thead: ({ className, children, ...props }) => (
-      <thead {...props} className={cn("bg-muted text-foreground", className)}>
-        {children}
-      </thead>
-    ),
-    tbody: ({ className, children, ...props }) => (
-      <tbody {...props} className={cn("divide-y divide-border", className)}>
-        {children}
-      </tbody>
-    ),
-    tr: ({ className, children, ...props }) => (
-      <tr {...props} className={cn("border-b border-border last:border-0", className)}>
-        {children}
-      </tr>
-    ),
-    th: ({ className, children, ...props }) => (
-      <th
-        {...props}
-        className={cn(
-          "px-3 py-2 text-left font-medium text-muted-foreground",
-          className
-        )}
-      >
-        {children}
-      </th>
-    ),
-    td: ({ className, children, ...props }) => (
-      <td {...props} className={cn("px-3 py-2 align-top", className)}>
-        {children}
-      </td>
-    ),
-  code: ({
-    inline,
-    className,
-    children,
-    ...props
-  }: {
-    inline?: boolean;
-    className?: string;
-    children?: ReactNode;
-  } & ComponentPropsWithoutRef<"code">) => {
-      if (inline) {
-        return (
-          <code
-            {...props}
-            className={cn("rounded bg-muted px-1 py-0.5 text-sm font-mono", className)}
-          >
-            {children}
-          </code>
-        );
-      }
-
-      return (
-        <pre className="bg-muted/70 p-3 rounded-lg overflow-x-auto text-sm">
-          <code
-            {...props}
-            className={cn("font-mono", className)}
-          >
-            {children}
-          </code>
-        </pre>
-      );
-    },
-  };
 
   return (
     <div className={`flex gap-3 ${isUser ? "flex-row-reverse" : "flex-row"} mb-6`}>
@@ -222,27 +55,22 @@ export function Message({ content, role, createdAt, senderAvatar }: MessageProps
             isUser ? "bg-blue-600 text-white" : "bg-muted text-foreground"
           }`}
         >
-          {isLoadingAssistant ? (
-            <div className="flex items-center justify-center gap-2">
-              <Spinner size="sm" />
-              {statusMessage ? (
-                <span className="text-sm text-muted-foreground animate-pulse">
-                  {statusMessage}
-                </span>
-              ) : null}
+          {shouldShowSpinner ? (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Spinner size="sm" className="message-spinner text-muted-foreground" />
+                {showThinking && (
+                  <span className="text-xs text-muted-foreground message-thinking">Thinking</span>
+                )}
+              </div>
+              {hasContent ? (
+                <Markdown content={content} invert={isUser} />
+              ) : (
+                <span className="text-sm text-muted-foreground">Waiting for a response...</span>
+              )}
             </div>
           ) : (
-            <ReactMarkdown
-              className={cn(
-                "prose max-w-none break-words whitespace-pre-wrap [&_*]:leading-relaxed",
-                isUser ? "prose-invert" : ""
-              )}
-              remarkPlugins={[remarkGfm, remarkBreaks]}
-              rehypePlugins={rehypePlugins}
-              components={markdownComponents}
-            >
-              {content}
-            </ReactMarkdown>
+            <Markdown content={content} invert={isUser} />
           )}
         </div>
 

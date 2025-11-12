@@ -989,6 +989,7 @@ function AppContent() {
                     activeMessages.map((message) => (
                       <Message
                         key={message.id}
+                        id={message.id}
                         content={message.content}
                         role={message.role}
                         createdAt={message.createdAt}

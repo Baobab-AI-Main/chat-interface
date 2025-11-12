@@ -1,0 +1,17 @@
+.message-spinner {
+  color: inherit;
+}
+
+.message-thinking {
+  animation: message-thinking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes message-thinking-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
