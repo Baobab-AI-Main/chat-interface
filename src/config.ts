@@ -12,6 +12,7 @@ const getNumber = (value: string | boolean | undefined): number | null => {
 
 export const appConfig = {
     automationEndpoint: getString(env.VITE_n8n_ENDPOINT),
+  automationApiKey: getString(env.VITE_n8n_KEY),
     automationTimeoutMs: getNumber(env.VITE_AUTOMATION_TIMEOUT_MS) ?? 120000,
     brandFallbackName: getString(env.VITE_BRAND_FALLBACK_NAME),
     brandLogoUrl: getString(env.VITE_BRAND_LOGO_URL),

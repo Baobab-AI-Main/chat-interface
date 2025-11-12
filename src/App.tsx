@@ -625,11 +625,17 @@ function AppContent() {
           abortController.abort();
         }, appConfig.automationTimeoutMs);
 
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+
+        if (appConfig.automationApiKey) {
+          headers["api-key"] = appConfig.automationApiKey;
+        }
+
         const response = await fetch(automationEndpoint, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({
             prompt: trimmed,
             conversation_id: conversationId,
