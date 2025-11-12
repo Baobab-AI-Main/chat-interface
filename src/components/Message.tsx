@@ -15,7 +15,8 @@ interface MessageProps {
 
 export function Message({ id, content, role, createdAt, senderAvatar }: MessageProps) {
   const isUser = role === "user";
-  const isProvisionalAssistant = role === "assistant" && id.startsWith("temp-");
+  const idForChecks = typeof id === "string" ? id : String(id ?? "");
+  const isProvisionalAssistant = role === "assistant" && idForChecks.startsWith("temp-");
   const hasContent = content.trim() !== "";
   const shouldShowSpinner = role === "assistant" && (isProvisionalAssistant || !hasContent);
   const [showThinking, setShowThinking] = useState(false);
