@@ -1,4 +1,5 @@
 import { appConfig } from "../config";
+import { supabase } from "./supabase";
 
 export interface UploadChatAttachmentPayload {
   file: File;
@@ -32,9 +33,19 @@ export async function uploadChatAttachment(
   formData.append("file", payload.file);
   formData.append("conversation_id", payload.conversationId);
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData?.session?.access_token;
+
+  const headers: HeadersInit = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
   const response = await fetch(endpoint, {
     method: "POST",
     body: formData,
+    headers,
+    credentials: "include",
   });
 
   if (!response.ok) {
