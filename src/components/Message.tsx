@@ -3,12 +3,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Spinner } from "./ui/spinner";
 import { appConfig } from "../config";
 import { Markdown } from "./Markdown";
+import { Image as ImageIcon } from "lucide-react";
 import "./Message.css";
 
 interface MessageAttachment {
+  id: string;
   fileName: string;
   mimeType: string;
-  previewUrl?: string | null;
+  fileUrl?: string | null;
 }
 
 interface MessageProps {
@@ -18,6 +20,7 @@ interface MessageProps {
   createdAt: string;
   senderAvatar?: string;
   attachment?: MessageAttachment | null;
+  onOpenAttachment?: (attachment: MessageAttachment) => void;
 }
 
 export function Message({
@@ -27,6 +30,7 @@ export function Message({
   createdAt,
   senderAvatar,
   attachment,
+  onOpenAttachment,
 }: MessageProps) {
   const isUser = role === "user";
   const idForChecks = typeof id === "string" ? id : String(id ?? "");
@@ -89,19 +93,16 @@ export function Message({
           )}
 
           {attachment ? (
-            <div className={`mt-3 rounded-lg bg-background/60 p-2 ${isUser ? "text-white" : "text-foreground"}`}>
-              {attachment.previewUrl ? (
-                <img
-                  src={attachment.previewUrl}
-                  alt={attachment.fileName}
-                  className="max-h-48 w-full rounded-md object-contain"
-                />
-              ) : (
-                <p className="text-xs">
-                  Image attachment: <span className="font-medium">{attachment.fileName}</span>
-                </p>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => onOpenAttachment?.(attachment)}
+              className={`mt-3 flex w-full items-center gap-3 rounded-lg bg-background/60 px-3 py-2 text-left transition hover:bg-background/80 ${isUser ? "text-white" : "text-foreground"}`}
+            >
+              <span className="flex h-9 w-9 items-center justify-center rounded-md bg-muted/70">
+                <ImageIcon className="h-4 w-4" />
+              </span>
+              <span className="flex-1 truncate text-xs font-medium">{attachment.fileName}</span>
+            </button>
           ) : null}
         </div>
 

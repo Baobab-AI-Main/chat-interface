@@ -15,7 +15,6 @@ import { appConfig } from "../config";
 interface ChatInputPayload {
   message: string;
   file?: File;
-  previewUrl?: string;
 }
 
 interface ChatInputProps {
@@ -30,7 +29,7 @@ export function ChatInput({
   placeholder = appConfig.chatInputPlaceholder,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
-  const [attachment, setAttachment] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [attachment, setAttachment] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resetAttachment = () => {
@@ -57,32 +56,10 @@ export function ChatInput({
     return true;
   };
 
-  const readPreview = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result === "string") {
-          resolve(reader.result);
-        } else {
-          reject(new Error("Unsupported preview format"));
-        }
-      };
-      reader.onerror = () => {
-        reject(new Error("Failed to generate image preview"));
-      };
-      reader.readAsDataURL(file);
-    });
-
-  const processFile = async (file: File) => {
+  const processFile = (file: File) => {
     if (!validateFile(file)) return;
 
-    try {
-      const previewUrl = await readPreview(file);
-      setAttachment({ file, previewUrl });
-    } catch (error) {
-      console.error(error);
-      toast.error("We could not preview that image. Please try a different file.");
-    }
+    setAttachment(file);
   };
 
   const submitMessage = () => {
@@ -97,8 +74,7 @@ export function ChatInput({
     if (!disabled) {
       const payload: ChatInputPayload = {
         message: trimmed,
-        file: attachment?.file,
-        previewUrl: attachment?.previewUrl,
+        file: attachment ?? undefined,
       };
 
       setMessage("");
@@ -131,29 +107,27 @@ export function ChatInput({
     const imageFile = Array.from(files).find((file) => file.type.startsWith("image/"));
     if (imageFile) {
       event.preventDefault();
-      void processFile(imageFile);
+      processFile(imageFile);
     }
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    void processFile(file);
+    processFile(file);
   };
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 p-4 border-t bg-background">
       {attachment ? (
         <div className="flex items-center gap-3 rounded-md border px-3 py-2">
-          <img
-            src={attachment.previewUrl}
-            alt={attachment.file.name}
-            className="h-16 w-16 rounded object-cover"
-          />
+          <div className="flex items-center justify-center h-12 w-12 rounded-md bg-muted">
+            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+          </div>
           <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium">{attachment.file.name}</p>
+            <p className="truncate text-sm font-medium">{attachment.name}</p>
             <p className="text-xs text-muted-foreground">
-              {(attachment.file.size / 1024).toFixed(1)} KB
+              {(attachment.size / 1024).toFixed(1)} KB
             </p>
           </div>
           <Button

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
+import { Client as MinioClient } from 'minio';
 
 const router = Router();
 
@@ -10,24 +11,10 @@ const router = Router();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB
+    fileSize: 10 * 1024 * 1024, // 10MB image cap
   },
   fileFilter: (_req, file, cb) => {
-    // Allowed MIME types
-    const allowed = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain',
-      'text/csv',
-    ];
-
+    const allowed = ['image/jpeg', 'image/png'];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -40,6 +27,23 @@ const upload = multer({
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
+const minioEndpoint = process.env.MINIO_ENDPOINT ?? '';
+const minioPort = Number(process.env.MINIO_PORT ?? '9000');
+const minioUseSSL = String(process.env.MINIO_USE_SSL ?? 'false').toLowerCase() === 'true';
+const minioAccessKey = process.env.MINIO_ACCESS_KEY ?? '';
+const minioSecretKey = process.env.MINIO_SECRET_KEY ?? '';
+const minioBucket = process.env.MINIO_BUCKET ?? 'chat-uploads';
+
+const minioPublicEndpoint = process.env.MINIO_PUBLIC_ENDPOINT ?? minioEndpoint;
+const minioPublicPort = Number(process.env.MINIO_PUBLIC_PORT ?? String(minioPort));
+const minioPublicUseSSL = process.env.MINIO_PUBLIC_USE_SSL
+  ? String(process.env.MINIO_PUBLIC_USE_SSL).toLowerCase() === 'true'
+  : minioUseSSL;
+
+if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
+  console.error('Missing MinIO environment variables for attachment upload');
+}
+
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   console.error('Missing Supabase environment variables for attachment upload');
 }
@@ -49,6 +53,22 @@ const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
     autoRefreshToken: false,
     persistSession: false,
   },
+});
+
+const minioInternalClient = new MinioClient({
+  endPoint: minioEndpoint,
+  port: minioPort,
+  useSSL: minioUseSSL,
+  accessKey: minioAccessKey,
+  secretKey: minioSecretKey,
+});
+
+const minioPublicClient = new MinioClient({
+  endPoint: minioPublicEndpoint,
+  port: minioPublicPort,
+  useSSL: minioPublicUseSSL,
+  accessKey: minioAccessKey,
+  secretKey: minioSecretKey,
 });
 
 /**
@@ -101,7 +121,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     // Verify user has access to this conversation
     const { data: conversation, error: convError } = await supabase
       .from('chat_conversations')
-      .select('id, owner_user_id, participant_ids')
+      .select('id, owner_user_id, participant_ids, org_id')
       .eq('id', conversation_id)
       .single();
 
@@ -116,14 +136,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       return res.status(403).json({ error: 'You do not have access to this conversation' });
     }
 
-    // Get org_id from conversation
-    const { data: convWithOrg } = await supabase
-      .from('chat_conversations')
-      .select('org_id')
-      .eq('id', conversation_id)
-      .single();
-
-    const org_id = convWithOrg?.org_id || 'default-org';
+    const orgId = conversation.org_id ?? 'default-org';
 
     // Generate unique filename
     const ext = path.extname(req.file.originalname);
@@ -136,34 +149,30 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
 
     // Build storage path: {org_id}/{conversation_id}/{message_id}/{uuid}-{safeName}
     // Note: message_id will be added when the attachment is recorded in the database
-    const storagePath = `${org_id}/${conversation_id}/uploads/${fileName}`;
+    const storagePath = `${orgId}/${conversation_id}/uploads/${fileName}`;
 
-    // Upload to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('chat-attachments')
-      .upload(storagePath, req.file.buffer, {
-        contentType: req.file.mimetype,
-        upsert: false,
+    try {
+      await minioInternalClient.putObject(minioBucket, storagePath, req.file.buffer, req.file.size, {
+        'Content-Type': req.file.mimetype,
       });
-
-    if (uploadError) {
-      console.error('Upload error:', uploadError);
-      return res.status(500).json({ error: `Failed to upload file: ${uploadError.message}` });
+    } catch (uploadError) {
+      console.error('MinIO upload error:', uploadError);
+      const message = uploadError instanceof Error ? uploadError.message : 'Unknown MinIO upload failure';
+      return res.status(500).json({ error: `Failed to upload file: ${message}` });
     }
 
-    // Generate a signed URL for the file (10 minutes)
-    const { data: signedUrlData, error: signedUrlError } = await supabase.storage
-      .from('chat-attachments')
-      .createSignedUrl(storagePath, 600); // 10 minutes
-
-    if (signedUrlError) {
-      console.error('Signed URL error:', signedUrlError);
-      return res.status(500).json({ error: `Failed to generate signed URL: ${signedUrlError.message}` });
+    let signedUrl: string | null = null;
+    try {
+      signedUrl = await minioPublicClient.presignedGetObject(minioBucket, storagePath, 600);
+    } catch (signedUrlError) {
+      console.error('MinIO signed URL error:', signedUrlError);
+      const message = signedUrlError instanceof Error ? signedUrlError.message : 'Unknown MinIO signed URL failure';
+      return res.status(500).json({ error: `Failed to generate signed URL: ${message}` });
     }
 
     res.json({
       storage_path: storagePath,
-      file_url: signedUrlData.signedUrl,
+      file_url: signedUrl,
       file_name: req.file.originalname,
       mime_type: req.file.mimetype,
       file_size: req.file.size,
@@ -172,6 +181,68 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     console.error('Attachment upload error:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to upload attachment',
+    });
+  }
+});
+
+router.get('/:attachmentId/url', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+
+    const token = authHeader.substring(7);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
+    if (authError || !user?.id) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    const attachmentId = req.params.attachmentId;
+    const { data: attachment, error: attachmentError } = await supabase
+      .from('chat_message_attachments')
+      .select('id, storage_path, conversation_id')
+      .eq('id', attachmentId)
+      .single();
+
+    if (attachmentError || !attachment) {
+      return res.status(404).json({ error: 'Attachment not found' });
+    }
+
+    const { data: conversation, error: convError } = await supabase
+      .from('chat_conversations')
+      .select('id, owner_user_id, participant_ids')
+      .eq('id', attachment.conversation_id)
+      .single();
+
+    if (convError || !conversation) {
+      return res.status(403).json({ error: 'Conversation not found or access denied' });
+    }
+
+    const isOwner = conversation.owner_user_id === user.id;
+    const isParticipant = conversation.participant_ids?.includes(user.id);
+    if (!isOwner && !isParticipant) {
+      return res.status(403).json({ error: 'You do not have access to this conversation' });
+    }
+
+    let signedUrl: string | null = null;
+    try {
+      signedUrl = await minioPublicClient.presignedGetObject(minioBucket, attachment.storage_path, 600);
+    } catch (error) {
+      console.error('MinIO signed URL error:', error);
+      const message = error instanceof Error ? error.message : 'Unknown MinIO signed URL failure';
+      return res.status(500).json({ error: `Failed to generate signed URL: ${message}` });
+    }
+
+    return res.json({ url: signedUrl });
+  } catch (error) {
+    console.error('Attachment signed URL error:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to create attachment URL',
     });
   }
 });
