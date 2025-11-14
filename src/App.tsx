@@ -576,6 +576,52 @@ function AppContent() {
     [isMobile]
   );
 
+  const attachmentUploadEndpoint = appConfig.attachmentUploadEndpoint;
+
+  const handleOpenAttachment = useCallback(
+    async (attachment: ChatMessageAttachment) => {
+      if (!attachment?.id) return;
+      if (!attachmentUploadEndpoint) {
+        toast.error("Attachment endpoint is not configured.");
+        return;
+      }
+
+      const targetUrl = new URL(`../${attachment.id}/url`, attachmentUploadEndpoint).toString();
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (!accessToken) {
+        toast.error("You need to sign in again to view this attachment.");
+        return;
+      }
+
+      try {
+        const response = await fetch(targetUrl, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(text || `Attachment request failed with ${response.status}`);
+        }
+
+        const data = (await response.json()) as { url?: string };
+        if (!data.url) {
+          throw new Error("Attachment link missing in response");
+        }
+
+        window.open(data.url, "_blank", "noopener,noreferrer");
+      } catch (error) {
+        console.error("Failed to open attachment", error);
+        toast.error("We could not open that attachment. Please try again.");
+      }
+    },
+    [attachmentUploadEndpoint]
+  );
+
   const handleSendMessage = useCallback(
     async ({ message, file }: { message: string; file?: File }) => {
       if (!user?.id || !activeConversationId) {
@@ -668,51 +714,6 @@ function AppContent() {
             toast.error("Image uploaded but could not be linked to the message.");
           }
         }
-
-                const handleOpenAttachment = useCallback(
-                  async (attachment: ChatMessageAttachment) => {
-                    if (!attachment?.id) return;
-                    if (!appConfig.attachmentUploadEndpoint) {
-                      toast.error("Attachment endpoint is not configured.");
-                      return;
-                    }
-
-                    const uploadUrl = appConfig.attachmentUploadEndpoint;
-                    const targetUrl = new URL(`../${attachment.id}/url`, uploadUrl).toString();
-
-                    const { data: sessionData } = await supabase.auth.getSession();
-                    const accessToken = sessionData?.session?.access_token;
-                    if (!accessToken) {
-                      toast.error("You need to sign in again to view this attachment.");
-                      return;
-                    }
-
-                    try {
-                      const response = await fetch(targetUrl, {
-                        headers: {
-                          Authorization: `Bearer ${accessToken}`,
-                        },
-                        credentials: "include",
-                      });
-
-                      if (!response.ok) {
-                        const text = await response.text().catch(() => "");
-                        throw new Error(text || `Attachment request failed with ${response.status}`);
-                      }
-
-                      const data = (await response.json()) as { url?: string };
-                      if (!data.url) {
-                        throw new Error("Attachment link missing in response");
-                      }
-
-                      window.open(data.url, "_blank", "noopener,noreferrer");
-                    } catch (error) {
-                      console.error("Failed to open attachment", error);
-                      toast.error("We could not open that attachment. Please try again.");
-                    }
-                  },
-                  [appConfig.attachmentUploadEndpoint],
-                );
 
         setMessagesByConversation((prev) => ({
           ...prev,
