@@ -5,15 +5,29 @@ import { appConfig } from "../config";
 import { Markdown } from "./Markdown";
 import "./Message.css";
 
+interface MessageAttachment {
+  fileName: string;
+  mimeType: string;
+  previewUrl?: string | null;
+}
+
 interface MessageProps {
   id: string;
   content: string;
   role: "user" | "assistant" | "system";
   createdAt: string;
   senderAvatar?: string;
+  attachment?: MessageAttachment | null;
 }
 
-export function Message({ id, content, role, createdAt, senderAvatar }: MessageProps) {
+export function Message({
+  id,
+  content,
+  role,
+  createdAt,
+  senderAvatar,
+  attachment,
+}: MessageProps) {
   const isUser = role === "user";
   const idForChecks = typeof id === "string" ? id : String(id ?? "");
   const isProvisionalAssistant = role === "assistant" && idForChecks.startsWith("temp-");
@@ -73,6 +87,22 @@ export function Message({ id, content, role, createdAt, senderAvatar }: MessageP
           ) : (
             <Markdown content={content} invert={isUser} />
           )}
+
+          {attachment ? (
+            <div className={`mt-3 rounded-lg bg-background/60 p-2 ${isUser ? "text-white" : "text-foreground"}`}>
+              {attachment.previewUrl ? (
+                <img
+                  src={attachment.previewUrl}
+                  alt={attachment.fileName}
+                  className="max-h-48 w-full rounded-md object-contain"
+                />
+              ) : (
+                <p className="text-xs">
+                  Image attachment: <span className="font-medium">{attachment.fileName}</span>
+                </p>
+              )}
+            </div>
+          ) : null}
         </div>
 
         <span className="mt-2 px-2 text-xs text-muted-foreground">{formattedTime}</span>

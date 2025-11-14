@@ -15,6 +15,7 @@ import { Toaster } from "./components/ui/sonner";
 import { supabase } from "./lib/supabase";
 import { formatTitle } from "./lib/title";
 import { appConfig } from "./config";
+import { uploadChatAttachment, type UploadChatAttachmentResult } from "./lib/attachments";
 
 interface Conversation {
   id: string;
@@ -51,6 +52,16 @@ interface N8nResponsePayload {
   invoice_from_xero?: XeroInvoiceSchema | null;
 }
 
+interface ChatMessageAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  storagePath: string;
+  previewUrl?: string | null;
+  fileUrl?: string | null;
+}
+
 interface ChatMessage {
   id: string;
   conversationId: string;
@@ -58,6 +69,7 @@ interface ChatMessage {
   content: string;
   createdAt: string;
   payload?: N8nResponsePayload;
+  attachment?: ChatMessageAttachment | null;
 }
 
 interface AutomationStreamMetadata {
@@ -90,6 +102,15 @@ type MessageRow = {
   content: string;
   payload: unknown;
   created_at: string;
+  chat_message_attachments?: AttachmentRow[] | null;
+};
+
+type AttachmentRow = {
+  id: string;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  storage_path: string;
 };
 
 type ChatMessageDetailRow = {
@@ -123,6 +144,17 @@ function mapConversationRow(row: ConversationRow): Conversation {
   };
 }
 
+function mapAttachmentRow(row: AttachmentRow): ChatMessageAttachment {
+  return {
+    id: row.id,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    fileSize: row.file_size,
+    storagePath: row.storage_path,
+    fileUrl: null,
+  };
+}
+
 function mapMessageRow(row: MessageRow): ChatMessage {
   const message: ChatMessage = {
     id: row.id,
@@ -136,6 +168,13 @@ function mapMessageRow(row: MessageRow): ChatMessage {
     const candidate = row.payload as Record<string, unknown>;
     if (typeof candidate.chat_response === "string") {
       message.payload = candidate as unknown as N8nResponsePayload;
+    }
+  }
+
+  if (Array.isArray(row.chat_message_attachments) && row.chat_message_attachments.length > 0) {
+    const [firstAttachment] = row.chat_message_attachments;
+    if (firstAttachment) {
+      message.attachment = mapAttachmentRow(firstAttachment);
     }
   }
 
@@ -382,7 +421,9 @@ function AppContent() {
     const fetchMessages = async () => {
       const { data, error } = await supabase
         .from("chat_messages")
-        .select("id, conversation_id, role, content, payload, created_at")
+        .select(
+          "id, conversation_id, role, content, payload, created_at, chat_message_attachments(id, file_name, mime_type, file_size, storage_path)"
+        )
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
 
@@ -537,13 +578,13 @@ function AppContent() {
   );
 
   const handleSendMessage = useCallback(
-    async (prompt: string) => {
+    async ({ message, file, previewUrl }: { message: string; file?: File; previewUrl?: string | null }) => {
       if (!user?.id || !activeConversationId) {
         toast.error("Select or create a conversation before sending a message.");
         return;
       }
 
-      const trimmed = prompt.trim();
+      const trimmed = message.trim();
       if (!trimmed) return;
 
       const conversationId = activeConversationId;
@@ -561,6 +602,22 @@ function AppContent() {
       let userMessage: ChatMessage | null = null;
       let provisionalId: string | null = null;
 
+      let uploadResult: UploadChatAttachmentResult | null = null;
+
+      if (file) {
+        try {
+          uploadResult = await uploadChatAttachment({
+            file,
+            conversationId,
+          });
+        } catch (error) {
+          console.error("Failed to upload attachment", error);
+          toast.error("We could not upload your image. Please try again.");
+          setSending(false);
+          return;
+        }
+      }
+
       try {
         const { data: userRow, error: userError } = await supabase
           .from("chat_messages")
@@ -571,12 +628,61 @@ function AppContent() {
             content: trimmed,
             payload: null,
           })
-          .select("id, conversation_id, role, content, payload, created_at")
+          .select(
+            "id, conversation_id, role, content, payload, created_at, chat_message_attachments(id, file_name, mime_type, file_size, storage_path)"
+          )
           .single();
 
         if (userError) throw userError;
 
         userMessage = mapMessageRow(userRow as MessageRow);
+
+        if (uploadResult && userMessage) {
+          try {
+            const { data: attachmentRow, error: attachmentError } = await supabase
+              .from("chat_message_attachments")
+              .insert({
+                message_id: userMessage.id,
+                conversation_id: conversationId,
+                file_name: uploadResult.fileName,
+                mime_type: uploadResult.mimeType,
+                file_size: uploadResult.fileSize,
+                storage_path: uploadResult.storagePath,
+                file_type: "image",
+              })
+              .select("id, file_name, mime_type, file_size, storage_path")
+              .single();
+
+            if (attachmentError) throw attachmentError;
+
+            if (attachmentRow) {
+              userMessage = {
+                ...userMessage,
+                attachment: {
+                  ...mapAttachmentRow(attachmentRow as AttachmentRow),
+                  previewUrl: previewUrl ?? null,
+                  fileUrl: uploadResult.fileUrl,
+                },
+              };
+            }
+          } catch (attachmentError) {
+            console.error("Failed to record attachment", attachmentError);
+            toast.error("Image uploaded but could not be linked to the message.");
+          }
+        } else if (previewUrl && file) {
+          userMessage = {
+            ...userMessage,
+            attachment: {
+              id: `local-${userMessage.id}`,
+              fileName: file.name,
+              mimeType: file.type,
+              fileSize: file.size,
+              storagePath: "",
+              previewUrl,
+              fileUrl: null,
+            },
+          };
+        }
 
         setMessagesByConversation((prev) => ({
           ...prev,
@@ -633,13 +739,21 @@ function AppContent() {
           headers["api-key"] = appConfig.automationApiKey;
         }
 
+        const requestBody: Record<string, unknown> = {
+          prompt: trimmed,
+          conversation_id: conversationId,
+        };
+
+        if (uploadResult) {
+          requestBody.file_url = uploadResult.fileUrl;
+          requestBody.file_name = uploadResult.fileName;
+          requestBody.file_mime_type = uploadResult.mimeType;
+        }
+
         const response = await fetch(automationEndpoint, {
           method: "POST",
           headers,
-          body: JSON.stringify({
-            prompt: trimmed,
-            conversation_id: conversationId,
-          }),
+          body: JSON.stringify(requestBody),
           signal: abortController.signal,
         });
 
@@ -993,6 +1107,7 @@ function AppContent() {
                         content={message.content}
                         role={message.role}
                         createdAt={message.createdAt}
+                        attachment={message.attachment}
                       />
                     ))
                   ) : (
