@@ -37,6 +37,14 @@ const supabaseServiceRoleKey =
   process.env.SUPABASE_SERVICE_KEY ||
   '';
 
+const supabaseAnonKey =
+  process.env.SUPABASE_ANON_KEY ||
+  process.env.VITE_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  '';
+
+const supabaseApiKey = supabaseServiceRoleKey || supabaseAnonKey;
+
 const minioEndpoint = process.env.MINIO_ENDPOINT ?? '';
 const minioPort = Number(process.env.MINIO_PORT ?? '9000');
 const minioUseSSL = String(process.env.MINIO_USE_SSL ?? 'false').toLowerCase() === 'true';
@@ -54,16 +62,9 @@ if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
   console.error('Missing MinIO environment variables for attachment upload');
 }
 
-if (!supabaseUrl || !supabaseServiceRoleKey) {
+if (!supabaseUrl || !supabaseApiKey) {
   console.error('Missing Supabase environment variables for attachment upload');
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
-});
 
 const minioInternalClient = new MinioClient({
   endPoint: minioEndpoint,
@@ -80,6 +81,24 @@ const minioPublicClient = new MinioClient({
   accessKey: minioAccessKey,
   secretKey: minioSecretKey,
 });
+
+function createSupabaseClient(accessToken: string) {
+  if (!supabaseUrl || !supabaseApiKey) {
+    throw new Error('Supabase client missing configuration');
+  }
+
+  return createClient(supabaseUrl, supabaseApiKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
+}
 
 /**
  * POST /api/chat/attachments/upload
@@ -112,6 +131,14 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
 
     const token = authHeader.substring(7);
 
+    let supabase;
+    try {
+      supabase = createSupabaseClient(token);
+    } catch (clientError) {
+      console.error('Supabase client initialization failed', clientError);
+      return res.status(500).json({ error: 'Supabase configuration error' });
+    }
+
     // Verify the token with Supabase
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     if (authError || !user?.id) {
@@ -136,11 +163,17 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
       .single();
 
     if (convError || !conversation) {
+      if (convError) {
+        console.error('Conversation lookup failed during upload', convError);
+      }
       return res.status(403).json({ error: 'Conversation not found or access denied' });
     }
 
     const isOwner = conversation.owner_user_id === user.id;
-    const isParticipant = conversation.participant_ids?.includes(user.id);
+    const participantIds = Array.isArray(conversation.participant_ids)
+      ? conversation.participant_ids
+      : [];
+    const isParticipant = participantIds.includes(user.id);
 
     if (!isOwner && !isParticipant) {
       return res.status(403).json({ error: 'You do not have access to this conversation' });
@@ -203,6 +236,13 @@ router.get('/:attachmentId/url', async (req: Request, res: Response) => {
     }
 
     const token = authHeader.substring(7);
+    let supabase;
+    try {
+      supabase = createSupabaseClient(token);
+    } catch (clientError) {
+      console.error('Supabase client initialization failed', clientError);
+      return res.status(500).json({ error: 'Supabase configuration error' });
+    }
     const {
       data: { user },
       error: authError,
@@ -230,11 +270,17 @@ router.get('/:attachmentId/url', async (req: Request, res: Response) => {
       .single();
 
     if (convError || !conversation) {
+      if (convError) {
+        console.error('Conversation lookup failed during signed URL fetch', convError);
+      }
       return res.status(403).json({ error: 'Conversation not found or access denied' });
     }
 
     const isOwner = conversation.owner_user_id === user.id;
-    const isParticipant = conversation.participant_ids?.includes(user.id);
+    const participantIds = Array.isArray(conversation.participant_ids)
+      ? conversation.participant_ids
+      : [];
+    const isParticipant = participantIds.includes(user.id);
     if (!isOwner && !isParticipant) {
       return res.status(403).json({ error: 'You do not have access to this conversation' });
     }
