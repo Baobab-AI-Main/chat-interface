@@ -22,7 +22,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Serve static files from Vite build
-const buildPath = path.join(__dirname, '../build');
+const buildPath = path.join(__dirname, '../../build');
 app.use(express.static(buildPath));
 
 // SPA fallback: serve index.html for all non-API routes

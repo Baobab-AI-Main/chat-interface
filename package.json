@@ -84,7 +84,7 @@
       "scripts": {
             "lint": "eslint . --ext .ts,.tsx",
             "dev": "vite",
-            "build": "vite build && tsc server/index.ts server/routes/attachments.ts --outDir dist --module esnext --target esnext --moduleResolution node --skipLibCheck true --esModuleInterop true --allowSyntheticDefaultImports true",
+            "build": "vite build && tsc server/index.ts server/routes/attachments.ts --outDir dist/server --rootDir server --module esnext --target esnext --moduleResolution node --skipLibCheck true --esModuleInterop true --allowSyntheticDefaultImports true",
             "preview": "vite preview",
             "start": "node dist/server/index.js",
             "start:dev": "tsx watch server/index.ts",

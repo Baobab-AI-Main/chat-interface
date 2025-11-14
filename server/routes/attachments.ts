@@ -24,8 +24,18 @@ const upload = multer({
 });
 
 // Initialize Supabase client using service role key (server-side)
-const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const supabaseUrl =
+  process.env.SUPABASE_URL ||
+  process.env.VITE_SUPABASE_URL ||
+  process.env.NEXT_PUBLIC_SUPABASE_URL ||
+  '';
+
+const supabaseServiceRoleKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_KEY ||
+  '';
 
 const minioEndpoint = process.env.MINIO_ENDPOINT ?? '';
 const minioPort = Number(process.env.MINIO_PORT ?? '9000');
