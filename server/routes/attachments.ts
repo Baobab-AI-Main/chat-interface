@@ -45,6 +45,15 @@ const supabaseAnonKey =
 
 const supabaseApiKey = supabaseServiceRoleKey || supabaseAnonKey;
 
+const supabaseAdminClient = supabaseServiceRoleKey && supabaseUrl
+  ? createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : null;
+
 const minioEndpoint = process.env.MINIO_ENDPOINT ?? '';
 const minioPort = Number(process.env.MINIO_PORT ?? '9000');
 const minioUseSSL = String(process.env.MINIO_USE_SSL ?? 'false').toLowerCase() === 'true';
@@ -57,6 +66,11 @@ const minioPublicPort = Number(process.env.MINIO_PUBLIC_PORT ?? String(minioPort
 const minioPublicUseSSL = process.env.MINIO_PUBLIC_USE_SSL
   ? String(process.env.MINIO_PUBLIC_USE_SSL).toLowerCase() === 'true'
   : minioUseSSL;
+const minioSignedUrlBase =
+  process.env.MINIO_SIGNED_URL_BASE ??
+  process.env.MINIO_PUBLIC_BASE_URL ??
+  process.env.MINIO_PUBLIC_URL ??
+  '';
 
 if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
   console.error('Missing MinIO environment variables for attachment upload');
@@ -83,6 +97,31 @@ const minioPublicClient = new MinioClient({
 });
 
 let bucketPromise: Promise<void> | null = null;
+
+function rewriteSignedUrl(url: string): string {
+  if (!minioSignedUrlBase) {
+    return url;
+  }
+
+  try {
+    const generated = new URL(url);
+    const externalBase = new URL(minioSignedUrlBase);
+
+    generated.protocol = externalBase.protocol;
+    generated.hostname = externalBase.hostname;
+
+    if (externalBase.port) {
+      generated.port = externalBase.port;
+    } else {
+      generated.port = '';
+    }
+
+    return generated.toString();
+  } catch (error) {
+    console.error('Failed to rewrite MinIO signed URL', error);
+    return url;
+  }
+}
 
 async function ensureBucketExists() {
   if (!bucketPromise) {
@@ -234,6 +273,7 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     let signedUrl: string | null = null;
     try {
       signedUrl = await minioPublicClient.presignedGetObject(minioBucket, storagePath, 600);
+      signedUrl = rewriteSignedUrl(signedUrl);
     } catch (signedUrlError) {
       console.error('MinIO signed URL error:', signedUrlError);
       const message = signedUrlError instanceof Error ? signedUrlError.message : 'Unknown MinIO signed URL failure';
@@ -315,6 +355,7 @@ router.get('/:attachmentId/url', async (req: Request, res: Response) => {
     let signedUrl: string | null = null;
     try {
       signedUrl = await minioPublicClient.presignedGetObject(minioBucket, attachment.storage_path, 600);
+      signedUrl = rewriteSignedUrl(signedUrl);
     } catch (error) {
       console.error('MinIO signed URL error:', error);
       const message = error instanceof Error ? error.message : 'Unknown MinIO signed URL failure';
@@ -326,6 +367,131 @@ router.get('/:attachmentId/url', async (req: Request, res: Response) => {
     console.error('Attachment signed URL error:', error);
     return res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to create attachment URL',
+    });
+  }
+});
+
+router.post('/save', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+
+    if (!supabaseAdminClient) {
+      console.error('Supabase admin client is not configured');
+      return res.status(500).json({ error: 'Supabase admin client unavailable' });
+    }
+
+    const token = authHeader.substring(7);
+    let supabase;
+    try {
+      supabase = createSupabaseClient(token);
+    } catch (clientError) {
+      console.error('Supabase client initialization failed', clientError);
+      return res.status(500).json({ error: 'Supabase configuration error' });
+    }
+
+    const {
+      message_id: rawMessageId,
+      conversation_id: rawConversationId,
+      storage_path: storagePath,
+      file_name: fileName,
+      mime_type: mimeType,
+      file_size: rawFileSize,
+      file_type: rawFileType,
+    } = req.body ?? {};
+
+    const messageId = Number(rawMessageId);
+    const conversationId = Number(rawConversationId);
+    const fileSize = Number(rawFileSize);
+    const fileType = typeof rawFileType === 'string' && rawFileType.trim().length > 0
+      ? rawFileType.trim().toLowerCase()
+      : 'image';
+
+    if (!Number.isFinite(messageId) || !Number.isFinite(conversationId)) {
+      return res.status(400).json({ error: 'message_id and conversation_id must be numbers' });
+    }
+
+    if (!storagePath || typeof storagePath !== 'string') {
+      return res.status(400).json({ error: 'storage_path is required' });
+    }
+
+    if (!fileName || typeof fileName !== 'string') {
+      return res.status(400).json({ error: 'file_name is required' });
+    }
+
+    if (!mimeType || typeof mimeType !== 'string') {
+      return res.status(400).json({ error: 'mime_type is required' });
+    }
+
+    if (!Number.isFinite(fileSize)) {
+      return res.status(400).json({ error: 'file_size must be a number' });
+    }
+
+    const allowedFileTypes = new Set(['image', 'file']);
+    const normalizedFileType = allowedFileTypes.has(fileType) ? fileType : 'image';
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser(token);
+
+    if (authError || !user?.id) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
+
+    const { data: conversation, error: convError } = await supabase
+      .from('chat_conversations')
+      .select('id, owner_user_id, participant_ids')
+      .eq('id', conversationId)
+      .single();
+
+    if (convError || !conversation) {
+      if (convError) {
+        console.error('Conversation lookup failed during attachment save', convError);
+      }
+      return res.status(403).json({ error: 'Conversation not found or access denied' });
+    }
+
+    const { data: message, error: messageError } = await supabase
+      .from('chat_messages')
+      .select('id, conversation_id')
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .single();
+
+    if (messageError || !message) {
+      if (messageError) {
+        console.error('Message lookup failed during attachment save', messageError);
+      }
+      return res.status(400).json({ error: 'Message not found for conversation' });
+    }
+
+    const { data: attachmentRow, error: attachmentError } = await supabaseAdminClient
+      .from('chat_message_attachments')
+      .insert({
+        message_id: messageId,
+        conversation_id: conversationId,
+        storage_path: storagePath,
+        file_name: fileName,
+        mime_type: mimeType,
+        file_size: fileSize,
+        file_type: normalizedFileType,
+      })
+      .select('id, file_name, mime_type, file_size, storage_path')
+      .single();
+
+    if (attachmentError || !attachmentRow) {
+      console.error('Attachment save insert failed', attachmentError);
+      return res.status(500).json({ error: 'Failed to save attachment' });
+    }
+
+    return res.json(attachmentRow);
+  } catch (error) {
+    console.error('Attachment save error:', error);
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Failed to save attachment',
     });
   }
 });

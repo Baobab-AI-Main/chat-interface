@@ -577,6 +577,18 @@ function AppContent() {
   );
 
   const attachmentUploadEndpoint = appConfig.attachmentUploadEndpoint;
+  const attachmentSaveEndpoint = useMemo(() => {
+    if (!attachmentUploadEndpoint) {
+      return "/api/chat/attachments/save";
+    }
+
+    try {
+      return new URL("../save", attachmentUploadEndpoint).toString();
+    } catch (error) {
+      console.error("Invalid attachment upload endpoint", error);
+      return "/api/chat/attachments/save";
+    }
+  }, [attachmentUploadEndpoint]);
 
   const handleOpenAttachment = useCallback(
     async (attachment: ChatMessageAttachment) => {
@@ -684,31 +696,45 @@ function AppContent() {
 
         if (uploadResult && userMessage) {
           try {
-            const { data: attachmentRow, error: attachmentError } = await supabase
-              .from("chat_message_attachments")
-              .insert({
+            const { data: sessionData } = await supabase.auth.getSession();
+            const accessToken = sessionData?.session?.access_token;
+
+            if (!accessToken) {
+              throw new Error("Missing access token");
+            }
+
+            const response = await fetch(attachmentSaveEndpoint, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              credentials: "include",
+              body: JSON.stringify({
                 message_id: userMessage.id,
                 conversation_id: conversationId,
+                storage_path: uploadResult.storagePath,
                 file_name: uploadResult.fileName,
                 mime_type: uploadResult.mimeType,
                 file_size: uploadResult.fileSize,
-                storage_path: uploadResult.storagePath,
                 file_type: "image",
-              })
-              .select("id, file_name, mime_type, file_size, storage_path")
-              .single();
+              }),
+            });
 
-            if (attachmentError) throw attachmentError;
-
-            if (attachmentRow) {
-              userMessage = {
-                ...userMessage,
-                attachment: {
-                  ...mapAttachmentRow(attachmentRow as AttachmentRow),
-                  fileUrl: uploadResult.fileUrl,
-                },
-              };
+            if (!response.ok) {
+              const text = await response.text().catch(() => "");
+              throw new Error(text || `Attachment save failed with ${response.status}`);
             }
+
+            const attachmentRow = (await response.json()) as AttachmentRow;
+
+            userMessage = {
+              ...userMessage,
+              attachment: {
+                ...mapAttachmentRow(attachmentRow),
+                fileUrl: uploadResult.fileUrl,
+              },
+            };
           } catch (attachmentError) {
             console.error("Failed to record attachment", attachmentError);
             toast.error("Image uploaded but could not be linked to the message.");
@@ -1096,6 +1122,7 @@ function AppContent() {
       user?.id,
       activeConversationId,
       activeConversation,
+      attachmentSaveEndpoint,
       persistConversationUpdates,
       refreshConversations,
       updateDetailsForConversation,
