@@ -478,22 +478,22 @@ router.post('/save', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Message not found for conversation' });
     }
 
+    // Use RPC function to insert with server-side validation
     const { data: attachmentRow, error: attachmentError } = await supabaseAdminClient
-      .from('chat_message_attachments')
-      .insert({
-        message_id: messageId,
-        conversation_id: conversationId,
-        storage_path: storagePath,
-        file_name: fileName,
-        mime_type: mimeType,
-        file_size: fileSize,
-        file_type: normalizedFileType,
+      .rpc('save_chat_attachment', {
+        p_message_id: messageId,
+        p_conversation_id: conversationId,
+        p_file_name: fileName,
+        p_file_type: normalizedFileType,
+        p_mime_type: mimeType,
+        p_file_size: fileSize,
+        p_storage_path: storagePath,
+        p_user_id: user.id,
       })
-      .select('id, file_name, mime_type, file_size, storage_path')
       .single();
 
     if (attachmentError || !attachmentRow) {
-      console.error('Attachment save insert failed', attachmentError);
+      console.error('Attachment save RPC call failed', attachmentError);
       return res.status(500).json({ error: 'Failed to save attachment' });
     }
 
