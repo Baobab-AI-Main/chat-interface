@@ -82,6 +82,27 @@ const minioPublicClient = new MinioClient({
   secretKey: minioSecretKey,
 });
 
+let bucketPromise: Promise<void> | null = null;
+
+async function ensureBucketExists() {
+  if (!bucketPromise) {
+    bucketPromise = (async () => {
+      try {
+        const exists = await minioInternalClient.bucketExists(minioBucket);
+        if (!exists) {
+          await minioInternalClient.makeBucket(minioBucket);
+          console.log(`Created MinIO bucket: ${minioBucket}`);
+        }
+      } catch (error) {
+        bucketPromise = null;
+        throw error;
+      }
+    })();
+  }
+
+  return bucketPromise;
+}
+
 function createSupabaseClient(accessToken: string) {
   if (!supabaseUrl || !supabaseApiKey) {
     throw new Error('Supabase client missing configuration');
@@ -128,6 +149,13 @@ router.post('/upload', upload.single('file'), async (req: Request, res: Response
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'Missing or invalid authorization header' });
     }
+
+      try {
+        await ensureBucketExists();
+      } catch (bucketError) {
+        console.error('MinIO bucket unavailable', bucketError);
+        return res.status(500).json({ error: 'Storage bucket is not available' });
+      }
 
     const token = authHeader.substring(7);
 
