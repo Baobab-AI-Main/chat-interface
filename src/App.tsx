@@ -369,12 +369,12 @@ function AppContent() {
 
   const refreshConversations = useCallback(
     async (options?: { selectId?: string }) => {
-      if (!user?.user_id) return;
+      if (!user?.id) return;
 
       const { data, error } = await supabase
         .from("chat_conversations")
         .select("id, title, created_at, updated_at")
-        .eq("owner_user_id", user.user_id)
+        .eq("owner_user_id", user.id)
         .order("updated_at", { ascending: false });
 
       if (error) {
@@ -396,11 +396,11 @@ function AppContent() {
         return mapped[0]?.id ?? null;
       });
     },
-    [user?.user_id]
+    [user?.id]
   );
 
   useEffect(() => {
-    if (!user?.user_id) {
+    if (!user?.id) {
       setConversations([]);
       setMessagesByConversation({});
       setDetailsByConversation({});
@@ -409,10 +409,10 @@ function AppContent() {
     }
 
     void refreshConversations();
-  }, [user?.user_id, refreshConversations]);
+  }, [user?.id, refreshConversations]);
 
   useEffect(() => {
-    if (!activeConversationId || !user?.user_id) return;
+    if (!activeConversationId || !user?.id) return;
 
     let isCancelled = false;
     const conversationId = activeConversationId;
@@ -446,10 +446,10 @@ function AppContent() {
     return () => {
       isCancelled = true;
     };
-  }, [activeConversationId, user?.user_id]);
+  }, [activeConversationId, user?.id]);
 
   useEffect(() => {
-    if (!activeConversationId || !user?.user_id) return;
+    if (!activeConversationId || !user?.id) return;
 
     let isCancelled = false;
     const conversationId = activeConversationId;
@@ -474,7 +474,7 @@ function AppContent() {
     return () => {
       isCancelled = true;
     };
-  }, [activeConversationId, user?.user_id, fetchConversationDetails]);
+  }, [activeConversationId, user?.id, fetchConversationDetails]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -506,7 +506,7 @@ function AppContent() {
   }, [hasDetails]);
 
   const handleNewSearch = useCallback(async () => {
-    if (!user?.user_id) {
+    if (!user?.id) {
       toast.error("You need to sign in to start a conversation.");
       return;
     }
@@ -515,8 +515,8 @@ function AppContent() {
       const { data: conversationRow, error: conversationError } = await supabase
         .from("chat_conversations")
         .insert({
-          owner_user_id: user.user_id,
-          participant_ids: [user.user_id],
+          owner_user_id: user.id,
+          participant_ids: [user.id],
           title: "Untitled conversation",
         })
         .select("id, title, created_at, updated_at")
@@ -563,7 +563,7 @@ function AppContent() {
       console.error("Failed to start conversation", error);
       toast.error("We couldn't start a new conversation. Please try again.");
     }
-  }, [user?.user_id, persistConversationUpdates, refreshConversations, isMobile]);
+  }, [user?.id, persistConversationUpdates, refreshConversations, isMobile]);
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
