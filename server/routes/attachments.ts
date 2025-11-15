@@ -451,6 +451,20 @@ router.post('/save', async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
+    // Get the users table ID (primary key) for this auth user
+    const { data: userRow, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
+
+    if (userError || !userRow?.id) {
+      console.error('Failed to find user in users table', { authUserId: user.id, error: userError });
+      return res.status(401).json({ error: 'User record not found' });
+    }
+
+    const userId = userRow.id; // This is users.id (the table primary key)
+
     const { data: conversation, error: convError } = await supabase
       .from('chat_conversations')
       .select('id, owner_user_id, participant_ids')
@@ -488,7 +502,8 @@ router.post('/save', async (req: Request, res: Response) => {
         p_mime_type: mimeType,
         p_file_size: fileSize,
         p_storage_path: storagePath,
-        p_user_id: user.id,
+        p_user_id: userId,
+        note: `Using users.id (${userId}) from auth user ${user.id}`,
       });
     }
 
@@ -501,7 +516,7 @@ router.post('/save', async (req: Request, res: Response) => {
         p_mime_type: mimeType,
         p_file_size: fileSize,
         p_storage_path: storagePath,
-        p_user_id: user.id,
+        p_user_id: userId,
       })
       .single();
 
@@ -510,7 +525,8 @@ router.post('/save', async (req: Request, res: Response) => {
         code: attachmentError?.code,
         message: attachmentError?.message,
         details: attachmentError?.details,
-        userId: user.id,
+        userId: userId,
+        authUserId: user.id,
         conversationId: conversationId,
         messageId: messageId,
       });
