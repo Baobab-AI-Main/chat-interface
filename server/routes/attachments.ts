@@ -71,6 +71,9 @@ const minioSignedUrlBase =
   process.env.MINIO_PUBLIC_BASE_URL ??
   process.env.MINIO_PUBLIC_URL ??
   '';
+const minioSignedUrlPort =
+  (process.env.MINIO_SIGNED_URL_PORT ?? process.env.MINIO_PUBLIC_PORT ?? '').toString().trim();
+const minioSignedUrlProtocol = (process.env.MINIO_SIGNED_URL_PROTOCOL ?? '').toString().trim();
 
 if (!minioEndpoint || !minioAccessKey || !minioSecretKey) {
   console.error('Missing MinIO environment variables for attachment upload');
@@ -107,11 +110,18 @@ function rewriteSignedUrl(url: string): string {
     const generated = new URL(url);
     const externalBase = new URL(minioSignedUrlBase);
 
-    generated.protocol = externalBase.protocol;
+    if (externalBase.protocol === ':' && minioSignedUrlProtocol) {
+      generated.protocol = `${minioSignedUrlProtocol.replace(/:$/, '')}:`;
+    } else if (externalBase.protocol && externalBase.protocol !== ':') {
+      generated.protocol = externalBase.protocol;
+    }
+
     generated.hostname = externalBase.hostname;
 
-    if (externalBase.port) {
+    if (externalBase.port && externalBase.port !== '0') {
       generated.port = externalBase.port;
+    } else if (minioSignedUrlPort) {
+      generated.port = minioSignedUrlPort;
     } else {
       generated.port = '';
     }
