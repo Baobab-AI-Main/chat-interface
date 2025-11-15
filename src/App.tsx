@@ -583,7 +583,13 @@ function AppContent() {
     }
 
     try {
-      return new URL("../save", attachmentUploadEndpoint).toString();
+      const uploadUrl = new URL(attachmentUploadEndpoint);
+      if (/\/upload\/?$/.test(uploadUrl.pathname)) {
+        uploadUrl.pathname = uploadUrl.pathname.replace(/\/upload\/?$/, "/save");
+      } else {
+        uploadUrl.pathname = `${uploadUrl.pathname.replace(/\/?$/, "/")}save`;
+      }
+      return uploadUrl.toString();
     } catch (error) {
       console.error("Invalid attachment upload endpoint", error);
       return "/api/chat/attachments/save";
