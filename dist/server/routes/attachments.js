@@ -406,22 +406,44 @@ router.post('/save', async (req, res) => {
             }
             return res.status(400).json({ error: 'Message not found for conversation' });
         }
+        // Use RPC function to insert with server-side validation
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('About to call save_chat_attachment RPC with params:', {
+                p_message_id: messageId,
+                p_conversation_id: conversationId,
+                p_file_name: fileName,
+                p_file_type: normalizedFileType,
+                p_mime_type: mimeType,
+                p_file_size: fileSize,
+                p_storage_path: storagePath,
+                p_user_id: user.id,
+            });
+        }
         const { data: attachmentRow, error: attachmentError } = await supabaseAdminClient
-            .from('chat_message_attachments')
-            .insert({
-            message_id: messageId,
-            conversation_id: conversationId,
-            storage_path: storagePath,
-            file_name: fileName,
-            mime_type: mimeType,
-            file_size: fileSize,
-            file_type: normalizedFileType,
+            .rpc('save_chat_attachment', {
+            p_message_id: messageId,
+            p_conversation_id: conversationId,
+            p_file_name: fileName,
+            p_file_type: normalizedFileType,
+            p_mime_type: mimeType,
+            p_file_size: fileSize,
+            p_storage_path: storagePath,
+            p_user_id: user.id,
         })
-            .select('id, file_name, mime_type, file_size, storage_path')
             .single();
         if (attachmentError || !attachmentRow) {
-            console.error('Attachment save insert failed', attachmentError);
-            return res.status(500).json({ error: 'Failed to save attachment' });
+            console.error('Attachment save RPC call failed', {
+                code: attachmentError?.code,
+                message: attachmentError?.message,
+                details: attachmentError?.details,
+                userId: user.id,
+                conversationId: conversationId,
+                messageId: messageId,
+            });
+            return res.status(500).json({ error: 'Failed to save attachment', details: attachmentError?.message });
+        }
+        if (process.env.NODE_ENV !== 'production') {
+            console.log('Attachment saved successfully:', attachmentRow);
         }
         return res.json(attachmentRow);
     }
